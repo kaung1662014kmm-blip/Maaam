@@ -1,0 +1,478 @@
+-- leaked by printed
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LP = Players.LocalPlayer
+
+local CT_ITEMS = {
+    { key = "Bat", match = function(n)
+        n = n:lower()
+        return n:find("bat") ~= nil or n:find("slap") ~= nil
+    end },
+    { key = "Medusa", match = function(n)
+        return n:lower():find("medusa") ~= nil
+    end },
+}
+
+local function ctMatchItem(inst)
+    if not (inst:IsA("Tool") or inst:IsA("Model") or inst:IsA("Accessory") or inst:IsA("BasePart")) then
+        return nil
+    end
+    for _, item in ipairs(CT_ITEMS) do
+        if item.match(inst.Name) then
+            return item
+        end
+    end
+    return nil
+end
+
+local function isReplicaStuff(d)
+    if d.Name == "LocalReplica" then
+        return true
+    end
+    return d:FindFirstAncestor("LocalReplica") ~= nil
+end
+
+local CT_Trans = {}
+do
+    local PRIORITY = { "custom", "rainbow", "transparent" }
+    local baseline = setmetatable({}, { __mode = "k" })
+    local claims = setmetatable({}, { __mode = "k" })
+    local guards = setmetatable({}, { __mode = "k" })
+
+    function CT_Trans.getBaseline(part)
+        local b = baseline[part]
+        if b ~= nil then
+            return b
+        end
+        local ok, val = pcall(function()
+            return part.Transparency
+        end)
+        if not ok then
+            return nil
+        end
+        baseline[part] = val
+        return val
+    end
+
+    local function wantedValue(part)
+        local c = claims[part]
+        if not c then
+            return nil
+        end
+        for _, who in ipairs(PRIORITY) do
+            if c[who] ~= nil then
+                return c[who]
+            end
+        end
+        return nil
+    end
+
+    local function setIfDifferent(part, v)
+        local ok, cur = pcall(function()
+            return part.Transparency
+        end)
+        if ok and cur ~= nil and math.abs(cur - v) <= 0.001 then
+            return
+        end
+        pcall(function()
+            part.Transparency = v
+        end)
+    end
+
+    local function resolve(part)
+        local v = wantedValue(part)
+        if v ~= nil then
+            setIfDifferent(part, v)
+            return
+        end
+        local b = baseline[part]
+        if b ~= nil then
+            setIfDifferent(part, b)
+        end
+    end
+
+    local function armGuard(part)
+        if guards[part] then
+            return
+        end
+        local ok, conn = pcall(function()
+            return part:GetPropertyChangedSignal("Transparency"):Connect(function()
+                local v = wantedValue(part)
+                if v == nil then
+                    return
+                end
+                local ok2, cur = pcall(function()
+                    return part.Transparency
+                end)
+                if ok2 and cur ~= nil and math.abs(cur - v) > 0.001 then
+                    pcall(function()
+                        part.Transparency = v
+                    end)
+                end
+            end)
+        end)
+        if ok and conn then
+            guards[part] = conn
+        end
+    end
+
+    local function disarmGuard(part)
+        local conn = guards[part]
+        if conn then
+            pcall(function()
+                conn:Disconnect()
+            end)
+            guards[part] = nil
+        end
+    end
+
+    function CT_Trans.enforce()
+        for part in pairs(claims) do
+            if part.Parent then
+                local v = wantedValue(part)
+                if v ~= nil then
+                    local ok, cur = pcall(function()
+                        return part.Transparency
+                    end)
+                    if ok and cur ~= nil and math.abs(cur - v) > 0.001 then
+                        pcall(function()
+                            part.Transparency = v
+                        end)
+                    end
+                end
+            end
+        end
+    end
+
+    function CT_Trans.claim(part, who, value)
+        if not part then
+            return
+        end
+        if CT_Trans.getBaseline(part) == nil then
+            return
+        end
+        local c = claims[part]
+        if not c then
+            c = {}
+            claims[part] = c
+        end
+        c[who] = value
+        armGuard(part)
+        resolve(part)
+    end
+
+    function CT_Trans.release(part, who)
+        if not part then
+            return
+        end
+        local c = claims[part]
+        if not c then
+            return
+        end
+        c[who] = nil
+        if next(c) == nil then
+            claims[part] = nil
+            disarmGuard(part)
+        end
+        if part.Parent then
+            resolve(part)
+        end
+    end
+end
+
+local CT_JANITORS = {}
+
+task.spawn(function()
+    while true do
+        task.wait(0.25)
+        if _G.AmbitiousCustomToolsEnabled == true then
+            pcall(CT_Trans.enforce)
+        end
+    end
+end)
+
+
+do
+
+    do
+
+        local ASSETS = {
+            DiamondSword      = { cat = "Bat",    label = "Diamond Sword",
+                                  mesh = "rbxassetid://8827558932", tex = "rbxassetid://8827558969",
+                                  scale = Vector3.new(0.2, 0.2, 0.2),
+                                  c0 = CFrame.new(-0.05, -0.1, -0.12) * CFrame.Angles(math.rad(90), math.rad(180), 300),
+
+                                  view = 4.9 },
+            Katana            = { cat = "Bat",    label = "Katana",
+                                  mesh = "rbxassetid://13528902482", tex = "rbxassetid://13528902373",
+                                  scale = Vector3.new(1.4, 1.4, 1.4),
+                                  c0 = CFrame.new(0, 0.6, 0) * CFrame.Angles(math.rad(270), math.rad(180), math.rad(180)),
+                                  view = 6.6 },
+            Skull             = { cat = "Medusa", label = "Skull",
+                                  mesh = "rbxassetid://2050312704", tex = "rbxassetid://2050313393",
+                                  scale = Vector3.new(1, 1, 1),
+                                  c0 = CFrame.new(0, 0.65, -0.4) * CFrame.Angles(math.rad(330), 0, 0),
+                                  view = 4.2 },
+            GoldenDesertEagle = { cat = "Medusa", label = "Golden Desert Eagle",
+                                  mesh = "rbxassetid://430251413", tex = "rbxassetid://435840335",
+                                  scale = Vector3.new(0.01, 0.01, 0.01),
+                                  c0 = CFrame.new(0, 0, -0.8) * CFrame.Angles(math.rad(330), math.rad(180), 0),
+                                  view = 3.0 },
+        }
+        _G.AmbitiousCustomToolAssets = ASSETS
+
+        _G.AmbitiousCustomToolSkins = _G.AmbitiousCustomToolSkins
+            or { Bat = "DiamondSword", Medusa = "GoldenDesertEagle" }
+
+        local function skinFor(cat)
+            local key = _G.AmbitiousCustomToolSkins[cat]
+            if key and ASSETS[key] and ASSETS[key].cat == cat then return key end
+            return (cat == "Bat") and "DiamondSword" or "GoldenDesertEagle"
+        end
+
+        local enabled       = false
+        local tracked       = setmetatable({}, { __mode = "k" })
+        local watchers      = setmetatable({}, { __mode = "k" })
+        local pendingHandle = setmetatable({}, { __mode = "k" })
+        local teardown
+
+        local function buildReplica(handle, mode)
+            local existing = handle:FindFirstChild("LocalReplica")
+            if existing then existing:Destroy() end
+
+            local data = ASSETS[mode] or ASSETS.DiamondSword
+
+            local m = Instance.new("Model")
+            m.Name = "LocalReplica"
+
+            local p = Instance.new("Part")
+            p.Name        = "MainPart"
+            p.CanCollide  = false
+            p.CanQuery    = false
+            p.CanTouch    = false
+            p.Massless    = true
+            p.Size        = Vector3.new(1, 1, 1)
+            p.Transparency= 0
+            p.Anchored    = false
+            p.Parent      = m
+
+            local mesh = Instance.new("SpecialMesh")
+            mesh.MeshType  = Enum.MeshType.FileMesh
+            mesh.MeshId    = data.mesh
+            mesh.TextureId = data.tex
+            mesh.Parent    = p
+
+            local w = Instance.new("Motor6D")
+            w.Part0 = handle
+            w.Part1 = p
+
+            mesh.Scale = data.scale
+            w.C0 = data.c0
+
+            w.Parent = p
+            m.Parent = handle
+            return m
+        end
+
+        local function hideNode(entry, d)
+            if isReplicaStuff(d) then return end
+            if d:IsA("BasePart") or d:IsA("Decal") or d:IsA("Texture") then
+                entry.hidden[d] = true
+                CT_Trans.claim(d, "custom", 1)
+            end
+        end
+
+        local function setupTool(tool)
+            if tracked[tool] then return end
+
+            local handle = tool:FindFirstChild("Handle")
+            if not handle then
+                if pendingHandle[tool] then return end
+                local c
+                c = tool.ChildAdded:Connect(function(child)
+                    if child.Name == "Handle" then
+                        pcall(function() c:Disconnect() end)
+                        pendingHandle[tool] = nil
+                        if enabled then setupTool(tool) end
+                    end
+                end)
+                pendingHandle[tool] = c
+                return
+            end
+
+            local entry = { hidden = {}, conns = {} }
+            tracked[tool] = entry
+
+            for _, d in ipairs(tool:GetDescendants()) do hideNode(entry, d) end
+
+            local item = ctMatchItem(tool)
+            local mode = skinFor((item and item.key == "Bat") and "Bat" or "Medusa")
+            entry.cat = (item and item.key == "Bat") and "Bat" or "Medusa"
+            buildReplica(handle, mode)
+
+            table.insert(entry.conns, tool.DescendantAdded:Connect(function(d)
+                task.defer(function()
+                    if tracked[tool] then hideNode(entry, d) end
+                end)
+            end))
+            table.insert(entry.conns, tool.AncestryChanged:Connect(function(_, parent)
+                if not parent then teardown(tool, false) end
+            end))
+        end
+
+        function teardown(tool, doRestore)
+            local entry = tracked[tool]
+            if not entry then return end
+            for _, conn in ipairs(entry.conns) do pcall(function() conn:Disconnect() end) end
+
+            local handle = tool:FindFirstChild("Handle")
+            if handle then
+                local rep = handle:FindFirstChild("LocalReplica")
+                if rep then pcall(function() rep:Destroy() end) end
+            end
+
+            for obj in pairs(entry.hidden) do
+                CT_Trans.release(obj, "custom")
+            end
+            entry.hidden = {}
+            tracked[tool] = nil
+        end
+
+        local function tryRegister(inst)
+            if not enabled then return end
+            if inst:IsA("Tool") and ctMatchItem(inst) then
+                setupTool(inst)
+            end
+        end
+
+        local function unwatch(container)
+            local conns = watchers[container]
+            if not conns then return end
+            for _, c in ipairs(conns) do pcall(function() c:Disconnect() end) end
+            watchers[container] = nil
+        end
+
+        local function watch(container)
+            if not container or watchers[container] then return end
+            watchers[container] = { container.ChildAdded:Connect(tryRegister) }
+            for _, child in ipairs(container:GetChildren()) do tryRegister(child) end
+        end
+
+        local function watchAll()
+            watch(_LP:FindFirstChildOfClass("Backpack"))
+            watch(_LP.Character)
+        end
+
+        _LP.ChildAdded:Connect(function(child)
+            if enabled and child:IsA("Backpack") then watch(child) end
+        end)
+
+        _LP.CharacterAdded:Connect(function(char)
+            for tool in pairs(tracked) do teardown(tool, false) end
+            for _, c in pairs(pendingHandle) do pcall(function() c:Disconnect() end) end
+            table.clear(pendingHandle)
+
+            for container in pairs(watchers) do unwatch(container) end
+            if not enabled then return end
+            watch(char)
+            task.defer(function()
+                if enabled then watchAll() end
+            end)
+        end)
+
+        table.insert(CT_JANITORS, function()
+            for tool in pairs(tracked) do
+                if not tool.Parent then teardown(tool, false) end
+            end
+            for tool, c in pairs(pendingHandle) do
+                if not tool.Parent then
+                    pcall(function() c:Disconnect() end)
+                    pendingHandle[tool] = nil
+                end
+            end
+            for container in pairs(watchers) do
+                if not container.Parent then unwatch(container) end
+            end
+        end)
+
+        local function rebuildIfNeeded(tool, entry, deep)
+            local handle = tool:FindFirstChild("Handle")
+            if not handle then return end
+            local rep      = handle:FindFirstChild("LocalReplica")
+            local mainPart = rep and rep:FindFirstChild("MainPart")
+            local motor    = mainPart and mainPart:FindFirstChildOfClass("Motor6D")
+            local broken   = (not rep) or (not mainPart) or (not motor) or motor.Part0 ~= handle
+            if broken then
+                local item = ctMatchItem(tool)
+                buildReplica(handle, skinFor((item and item.key == "Bat") and "Bat" or "Medusa"))
+            end
+
+            if broken or deep then
+                for _, d in ipairs(tool:GetDescendants()) do hideNode(entry, d) end
+            end
+        end
+
+        local function integrityPass(deep)
+            if not enabled then return end
+
+            watchAll()
+            local bp = _LP:FindFirstChildOfClass("Backpack")
+            if bp then for _, ch in ipairs(bp:GetChildren()) do tryRegister(ch) end end
+            local chr = _LP.Character
+            if chr then for _, ch in ipairs(chr:GetChildren()) do tryRegister(ch) end end
+            for tool, entry in pairs(tracked) do
+                if not tool.Parent then
+                    teardown(tool, false)
+                else
+                    rebuildIfNeeded(tool, entry, deep)
+                end
+            end
+        end
+
+        _G.AmbitiousCustomToolsRecheck = function() pcall(integrityPass, true) end
+
+        _G.AmbitiousSetCustomToolSkin = function(cat, key)
+            if not ASSETS[key] or ASSETS[key].cat ~= cat then return end
+            _G.AmbitiousCustomToolSkins[cat] = key
+            for tool, entry in pairs(tracked) do
+                if tool.Parent and entry.cat == cat then
+                    local handle = tool:FindFirstChild("Handle")
+                    if handle then pcall(buildReplica, handle, key) end
+                end
+            end
+            if saveAmbitiousConfig then pcall(saveAmbitiousConfig) end
+        end
+
+        task.spawn(function()
+            local n = 0
+            while true do
+                task.wait(0.4)
+                if enabled then
+                    n = n + 1
+                    pcall(integrityPass, (n % 5) == 0)
+                end
+            end
+        end)
+
+        _LP.CharacterAdded:Connect(function()
+            task.delay(0.6, function() if enabled then pcall(integrityPass, true) end end)
+        end)
+
+        _G.AmbitiousCustomTools = {
+            setEnabled = function(on)
+                on = on and true or false
+                enabled = on
+                _G.AmbitiousCustomToolsEnabled = on
+                if on then
+                    watchAll()
+                    pcall(integrityPass, true)
+                else
+                    for tool in pairs(tracked) do teardown(tool, true) end
+                    for _, c in pairs(pendingHandle) do pcall(function() c:Disconnect() end) end
+                    table.clear(pendingHandle)
+                    for container in pairs(watchers) do unwatch(container) end
+                end
+            end,
+            isEnabled = function() return enabled end,
+        }
+    end
