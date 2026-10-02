@@ -1,0 +1,423 @@
+--[[
+	ORVYN SPEED BYPASS
+	V1 + V2 + Keyboard/Gamepad Keybind + Auto Save
+]]
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+
+local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- ===== CONFIG =====
+local CONFIG_FILE = "OrvynSpeedBypass_Config.json"
+
+local cfg = {
+	power = 100000,
+	keybind = "B",
+	version = 2
+}
+
+local function saveConfig()
+	if writefile then
+		pcall(function()
+			writefile(CONFIG_FILE, HttpService:JSONEncode(cfg))
+		end)
+	end
+end
+
+local function loadConfig()
+	if isfile and readfile and isfile(CONFIG_FILE) then
+		local ok, data = pcall(function()
+			return HttpService:JSONDecode(readfile(CONFIG_FILE))
+		end)
+		if ok and type(data) == "table" then
+			cfg.power = tonumber(data.power) or 100000
+			cfg.keybind = type(data.keybind) == "string" and data.keybind or "B"
+			cfg.version = tonumber(data.version) or 2
+		end
+	end
+end
+
+loadConfig()
+
+-- ===== BYPASS =====
+local running = false
+local spamThread = nil
+local currentVersion = cfg.version
+local powerValue = cfg.power
+local active = false
+local boundKey = Enum.KeyCode[cfg.keybind] or Enum.KeyCode.B
+local waitingForKey = false
+
+local V1_DEPTH, V1_DELAY = 200, 0.15
+local V2_DEPTH, V2_DELAY = 296, 0.12
+
+local function isGamepad(kc)
+	local n = kc.Name
+	return n:sub(1,6) == "Button" or n:sub(1,10) == "Thumbstick" or n:sub(1,4) == "DPad" or n == "ButtonSelect" or n == "ButtonStart"
+end
+
+local function buildBomb(power, depth)
+	local maintable = {}
+	local spammedtable = {{}}
+	local z = spammedtable[1]
+	for i = 1, depth do
+		local t = {}
+		table.insert(z, t)
+		z = t
+	end
+	for i = 1, math.floor(power / (depth + 2)) do
+		table.insert(maintable, spammedtable)
+	end
+	return maintable
+end
+
+local function stopBypass()
+	running = false
+	if spamThread then pcall(function() task.cancel(spamThread) end) end
+	spamThread = nil
+end
+
+local function startBypass(power)
+	stopBypass()
+	running = true
+	local depth = (currentVersion == 1) and V1_DEPTH or V2_DEPTH
+	local delay = (currentVersion == 1) and V1_DELAY or V2_DELAY
+	local bomb = buildBomb(power, depth)
+	spamThread = task.spawn(function()
+		while running do
+			pcall(function()
+				game.RobloxReplicatedStorage.SetPlayerBlockList:FireServer(bomb)
+			end)
+			task.wait(delay)
+		end
+	end)
+end
+
+-- ===== GUI =====
+pcall(function()
+	local old = playerGui:FindFirstChild("OrvynSpeedBypass")
+	if old then old:Destroy() end
+end)
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "OrvynSpeedBypass"
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.Parent = playerGui
+
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 260, 0, 210)
+main.Position = UDim2.new(0.5, -130, 0.5, -105)
+main.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+main.BackgroundTransparency = 0.05
+main.BorderSizePixel = 0
+main.ClipsDescendants = true
+main.Active = true
+main.Parent = gui
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 12)
+
+local mainStroke = Instance.new("UIStroke")
+mainStroke.Color = Color3.fromRGB(40, 40, 55)
+mainStroke.Thickness = 1.1
+mainStroke.Parent = main
+
+-- Header
+local header = Instance.new("Frame")
+header.Size = UDim2.new(1, -16, 0, 28)
+header.Position = UDim2.new(0, 8, 0, 8)
+header.BackgroundTransparency = 1
+header.ZIndex = 5
+header.Parent = main
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(0, 160, 1, 0)
+title.Position = UDim2.new(0, 4, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "ORVYN SPEED BYPASS"
+title.TextColor3 = Color3.fromRGB(240, 240, 245)
+title.TextSize = 12
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.ZIndex = 6
+title.Parent = header
+
+local versionFrame = Instance.new("Frame")
+versionFrame.Size = UDim2.new(0, 64, 0, 22)
+versionFrame.Position = UDim2.new(1, -64, 0.5, -11)
+versionFrame.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
+versionFrame.BorderSizePixel = 0
+versionFrame.ZIndex = 6
+versionFrame.Parent = header
+Instance.new("UICorner", versionFrame).CornerRadius = UDim.new(0, 6)
+
+local prevBtn = Instance.new("TextButton")
+prevBtn.Size = UDim2.new(0, 18, 1, 0)
+prevBtn.BackgroundTransparency = 1
+prevBtn.Text = "<"
+prevBtn.TextColor3 = Color3.fromRGB(180, 180, 200)
+prevBtn.TextSize = 12
+prevBtn.Font = Enum.Font.GothamBold
+prevBtn.ZIndex = 7
+prevBtn.Parent = versionFrame
+
+local versionLbl = Instance.new("TextLabel")
+versionLbl.Size = UDim2.new(0, 28, 1, 0)
+versionLbl.Position = UDim2.new(0, 18, 0, 0)
+versionLbl.BackgroundTransparency = 1
+versionLbl.Text = "v" .. currentVersion
+versionLbl.TextColor3 = Color3.fromRGB(230, 230, 240)
+versionLbl.TextSize = 11
+versionLbl.Font = Enum.Font.GothamBold
+versionLbl.ZIndex = 7
+versionLbl.Parent = versionFrame
+
+local nextBtn = Instance.new("TextButton")
+nextBtn.Size = UDim2.new(0, 18, 1, 0)
+nextBtn.Position = UDim2.new(1, -18, 0, 0)
+nextBtn.BackgroundTransparency = 1
+nextBtn.Text = ">"
+nextBtn.TextColor3 = Color3.fromRGB(180, 180, 200)
+nextBtn.TextSize = 12
+nextBtn.Font = Enum.Font.GothamBold
+nextBtn.ZIndex = 7
+nextBtn.Parent = versionFrame
+
+-- Content
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1, -16, 0, 160)
+content.Position = UDim2.new(0, 8, 0, 40)
+content.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+content.BackgroundTransparency = 0.15
+content.BorderSizePixel = 0
+content.ZIndex = 3
+content.Parent = main
+Instance.new("UICorner", content).CornerRadius = UDim.new(0, 10)
+
+local function createRow(y, labelText)
+	local row = Instance.new("Frame")
+	row.Size = UDim2.new(1, -16, 0, 30)
+	row.Position = UDim2.new(0, 8, 0, y)
+	row.BackgroundColor3 = Color3.fromRGB(25, 25, 34)
+	row.BackgroundTransparency = 0.2
+	row.BorderSizePixel = 0
+	row.ZIndex = 4
+	row.Parent = content
+	Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
+
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(0.4, 0, 1, 0)
+	lbl.Position = UDim2.new(0, 10, 0, 0)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = labelText
+	lbl.TextColor3 = Color3.fromRGB(200, 200, 215)
+	lbl.TextSize = 12
+	lbl.Font = Enum.Font.GothamMedium
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.ZIndex = 5
+	lbl.Parent = row
+	return row
+end
+
+-- Activate
+local activateRow = createRow(8, "Activate")
+local toggleBg = Instance.new("Frame")
+toggleBg.Size = UDim2.new(0, 36, 0, 20)
+toggleBg.Position = UDim2.new(1, -46, 0.5, -10)
+toggleBg.BackgroundColor3 = Color3.fromRGB(45, 45, 58)
+toggleBg.BorderSizePixel = 0
+toggleBg.ZIndex = 5
+toggleBg.Parent = activateRow
+Instance.new("UICorner", toggleBg).CornerRadius = UDim.new(1, 0)
+
+local toggleCircle = Instance.new("Frame")
+toggleCircle.Size = UDim2.new(0, 16, 0, 16)
+toggleCircle.Position = UDim2.new(0, 2, 0.5, -8)
+toggleCircle.BackgroundColor3 = Color3.fromRGB(240, 240, 245)
+toggleCircle.BorderSizePixel = 0
+toggleCircle.ZIndex = 6
+toggleCircle.Parent = toggleBg
+Instance.new("UICorner", toggleCircle).CornerRadius = UDim.new(1, 0)
+
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(1, 0, 1, 0)
+toggleBtn.BackgroundTransparency = 1
+toggleBtn.Text = ""
+toggleBtn.ZIndex = 7
+toggleBtn.Parent = toggleBg
+
+-- Status
+local statusRow = createRow(44, "Status")
+local statusLbl = Instance.new("TextLabel")
+statusLbl.Size = UDim2.new(0, 70, 1, 0)
+statusLbl.Position = UDim2.new(1, -80, 0, 0)
+statusLbl.BackgroundTransparency = 1
+statusLbl.Text = "OFFLINE"
+statusLbl.TextColor3 = Color3.fromRGB(160, 160, 180)
+statusLbl.TextSize = 12
+statusLbl.Font = Enum.Font.GothamBold
+statusLbl.TextXAlignment = Enum.TextXAlignment.Right
+statusLbl.ZIndex = 5
+statusLbl.Parent = statusRow
+
+-- Power
+local powerRow = createRow(80, "Power")
+local powerBox = Instance.new("TextBox")
+powerBox.Size = UDim2.new(0, 70, 0, 22)
+powerBox.Position = UDim2.new(1, -80, 0.5, -11)
+powerBox.BackgroundColor3 = Color3.fromRGB(30, 30, 42)
+powerBox.BorderSizePixel = 0
+powerBox.Text = tostring(powerValue)
+powerBox.TextColor3 = Color3.fromRGB(230, 230, 245)
+powerBox.TextSize = 12
+powerBox.Font = Enum.Font.GothamBold
+powerBox.TextXAlignment = Enum.TextXAlignment.Center
+powerBox.ClearTextOnFocus = false
+powerBox.ZIndex = 5
+powerBox.Parent = powerRow
+Instance.new("UICorner", powerBox).CornerRadius = UDim.new(0, 6)
+
+-- Keybind
+local keyRow = createRow(116, "Keybind")
+
+local keyBtn = Instance.new("TextButton")
+keyBtn.Size = UDim2.new(0, 52, 0, 22)
+keyBtn.Position = UDim2.new(1, -86, 0.5, -11)
+keyBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 42)
+keyBtn.BorderSizePixel = 0
+keyBtn.Text = (cfg.keybind == "None" or cfg.keybind == "") and "None" or boundKey.Name
+keyBtn.TextColor3 = Color3.fromRGB(230, 230, 245)
+keyBtn.TextSize = 11
+keyBtn.Font = Enum.Font.GothamBold
+keyBtn.ZIndex = 5
+keyBtn.Parent = keyRow
+Instance.new("UICorner", keyBtn).CornerRadius = UDim.new(0, 6)
+
+-- Croix (clear keybind)
+local clearBtn = Instance.new("TextButton")
+clearBtn.Size = UDim2.new(0, 22, 0, 22)
+clearBtn.Position = UDim2.new(1, -28, 0.5, -11)
+clearBtn.BackgroundColor3 = Color3.fromRGB(50, 20, 25)
+clearBtn.BorderSizePixel = 0
+clearBtn.Text = "✕"
+clearBtn.TextColor3 = Color3.fromRGB(255, 100, 110)
+clearBtn.TextSize = 12
+clearBtn.Font = Enum.Font.GothamBold
+clearBtn.ZIndex = 5
+clearBtn.Parent = keyRow
+Instance.new("UICorner", clearBtn).CornerRadius = UDim.new(0, 6)
+
+-- ===== LOGIC =====
+local function updateVisual()
+	if active then
+		statusLbl.Text = "ONLINE"
+		statusLbl.TextColor3 = Color3.fromRGB(80, 255, 140)
+		TweenService:Create(toggleCircle, TweenInfo.new(0.15), {Position = UDim2.new(1, -18, 0.5, -8)}):Play()
+		TweenService:Create(toggleBg, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(50, 180, 90)}):Play()
+	else
+		statusLbl.Text = "OFFLINE"
+		statusLbl.TextColor3 = Color3.fromRGB(160, 160, 180)
+		TweenService:Create(toggleCircle, TweenInfo.new(0.15), {Position = UDim2.new(0, 2, 0.5, -8)}):Play()
+		TweenService:Create(toggleBg, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(45, 45, 58)}):Play()
+	end
+end
+
+local function setActive(state)
+	active = state
+	if state then startBypass(powerValue) else stopBypass() end
+	updateVisual()
+end
+
+local function setVersion(v)
+	currentVersion = v
+	cfg.version = v
+	versionLbl.Text = "v" .. v
+	saveConfig()
+	if active then startBypass(powerValue) end
+end
+
+toggleBtn.MouseButton1Click:Connect(function() setActive(not active) end)
+prevBtn.MouseButton1Click:Connect(function() setVersion(currentVersion == 2 and 1 or 2) end)
+nextBtn.MouseButton1Click:Connect(function() setVersion(currentVersion == 2 and 1 or 2) end)
+
+powerBox.FocusLost:Connect(function()
+	local n = tonumber(powerBox.Text)
+	if n then
+		powerValue = math.clamp(math.floor(n), 1, 999999)
+		powerBox.Text = tostring(powerValue)
+		cfg.power = powerValue
+		saveConfig()
+		if active then startBypass(powerValue) end
+	else
+		powerBox.Text = tostring(powerValue)
+	end
+end)
+
+keyBtn.MouseButton1Click:Connect(function()
+	if waitingForKey then return end
+	waitingForKey = true
+	keyBtn.Text = "..."
+end)
+
+clearBtn.MouseButton1Click:Connect(function()
+	boundKey = nil
+	cfg.keybind = "None"
+	keyBtn.Text = "None"
+	waitingForKey = false
+	saveConfig()
+end)
+
+UserInputService.InputBegan:Connect(function(inp, gpe)
+	local kc = inp.KeyCode
+	if kc == Enum.KeyCode.Unknown then return end
+
+	if waitingForKey then
+		if kc == Enum.KeyCode.Escape then
+			waitingForKey = false
+			keyBtn.Text = cfg.keybind == "None" and "None" or (boundKey and boundKey.Name or "None")
+			return
+		end
+		-- Accepte clavier + manette
+		boundKey = kc
+		cfg.keybind = kc.Name
+		keyBtn.Text = kc.Name
+		waitingForKey = false
+		saveConfig()
+		return
+	end
+
+	if gpe then return end
+
+	-- Activation via keybind (clavier ou manette)
+	if boundKey and kc == boundKey then
+		setActive(not active)
+	end
+end)
+
+-- Drag
+local dragging, dragStart, startPos
+main.InputBegan:Connect(function(inp)
+	if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = inp.Position
+		startPos = main.Position
+	end
+end)
+UserInputService.InputEnded:Connect(function(inp)
+	if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+		dragging = false
+	end
+end)
+UserInputService.InputChanged:Connect(function(inp)
+	if dragging and (inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch) then
+		local d = inp.Position - dragStart
+		main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
+	end
+end)
+
+updateVisual()
+print("[ORVYN SPEED BYPASS] Keyboard + Gamepad Ready")
