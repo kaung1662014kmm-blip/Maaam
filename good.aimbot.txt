@@ -1,0 +1,356 @@
+local Players=game:GetService("Players")
+local RunService=game:GetService("RunService")
+local UserInputService=game:GetService("UserInputService")
+local TweenService=game:GetService("TweenService")
+local LP=Players.LocalPlayer
+
+local AimbotState={enabled=false,speed=56.5,meleeOffset=2,autoDropBrainrot=true,highlightEnabled=true}
+
+local function findBat()
+local c=LP.Character
+if not c then return nil end
+local bp=LP:FindFirstChildOfClass("Backpack")
+for _,ch in ipairs(c:GetChildren())do
+if ch:IsA("Tool")and(ch.Name:lower():find("bat")or ch.Name:lower():find("slap"))then return ch end
+end
+if bp then
+for _,ch in ipairs(bp:GetChildren())do
+if ch:IsA("Tool")and(ch.Name:lower():find("bat")or ch.Name:lower():find("slap"))then return ch end
+end
+end
+local SlapList={"Bat","Slap","Iron Slap","Gold Slap","Diamond Slap","Emerald Slap","Ruby Slap","Dark Matter Slap","Flame Slap","Nuclear Slap","Galaxy Slap","Glitched Slap"}
+for _,name in ipairs(SlapList)do
+local t=c:FindFirstChild(name)or(bp and bp:FindFirstChild(name))
+if t then return t end
+end
+return nil
+end
+
+local aimbotHighlight=Instance.new("Highlight")
+aimbotHighlight.Name="AimbotESP"
+aimbotHighlight.FillColor=Color3.fromRGB(255,0,0)
+aimbotHighlight.OutlineColor=Color3.fromRGB(255,255,255)
+aimbotHighlight.FillTransparency=0.5
+aimbotHighlight.OutlineTransparency=0
+aimbotHighlight.Adornee=nil
+pcall(function()aimbotHighlight.Parent=game:GetService("CoreGui")end)
+if not aimbotHighlight.Parent then aimbotHighlight.Parent=LP:WaitForChild("PlayerGui")end
+
+local aimbotLockedTarget=nil
+local aimbotNoTargetSince=nil
+local aimbotConnection=nil
+local antiDieConns={}
+
+local function _aimbotTargetValid(tc)
+if not tc or not tc.Parent then return false end
+local hum=tc:FindFirstChildOfClass("Humanoid")
+local hrp2=tc:FindFirstChild("HumanoidRootPart")
+return hum and hrp2
+end
+
+local function _aimbotGetTarget(myHRP)
+if aimbotLockedTarget and not _aimbotTargetValid(aimbotLockedTarget)then
+aimbotLockedTarget=nil
+end
+if aimbotLockedTarget then
+return aimbotLockedTarget:FindFirstChild("HumanoidRootPart"),aimbotLockedTarget
+end
+local best,bestDist=nil,math.huge
+for _,p in ipairs(Players:GetPlayers())do
+if p~=LP and _aimbotTargetValid(p.Character)then
+local tHRP=p.Character:FindFirstChild("HumanoidRootPart")
+local d=(tHRP.Position-myHRP.Position).Magnitude
+if d<bestDist then bestDist=d best=p.Character end
+end
+end
+aimbotLockedTarget=best
+return best and best:FindFirstChild("HumanoidRootPart"),best
+end
+
+local function _activateAntiDie()
+for _,c in ipairs(antiDieConns)do pcall(function()c:Disconnect()end)end
+antiDieConns={}
+local char=LP.Character
+if not char then return end
+local hum=char:FindFirstChildOfClass("Humanoid")
+if not hum then return end
+hum.BreakJointsOnDeath=false
+hum:SetStateEnabled(Enum.HumanoidStateType.Dead,false)
+table.insert(antiDieConns,hum:GetPropertyChangedSignal("Health"):Connect(function()
+if hum.Health<=0 then hum.Health=hum.MaxHealth end
+end))
+end
+
+local function isHoldingBrainrot()
+local char=LP.Character
+if not char then return false end
+for _,obj in ipairs(char:GetChildren())do
+if obj:IsA("Tool")then
+local n=obj.Name:lower()
+if not n:find("bat")and not n:find("slap")and not n:find("medusa")then
+return true
+end
+end
+end
+return false
+end
+
+local function dropBrainrot()
+local char=LP.Character
+if not char then return end
+local hum=char:FindFirstChildOfClass("Humanoid")
+if hum then
+hum.Jump=true
+task.wait(0.1)
+hum.Jump=false
+end
+end
+
+local function startAimbot()
+if aimbotConnection then aimbotConnection:Disconnect()aimbotConnection=nil end
+_activateAntiDie()
+aimbotConnection=RunService.Heartbeat:Connect(function()
+local char=LP.Character
+if not char or not char.Parent then return end
+local myHRP=char:FindFirstChild("HumanoidRootPart")
+if not myHRP then return end
+local myH=char:FindFirstChildOfClass("Humanoid")
+if not myH or myH.Health<=0 then return end
+if not AimbotState.enabled then
+if AimbotState.highlightEnabled then aimbotHighlight.Adornee=nil end
+return
+end
+myH.AutoRotate=false
+local bat=findBat()
+if bat and bat.Parent~=char then pcall(function()myH:EquipTool(bat)end)end
+if AimbotState.autoDropBrainrot and isHoldingBrainrot()then dropBrainrot()end
+myH:Move(Vector3.new(0,0,0),false)
+local tHRP,tChar=_aimbotGetTarget(myHRP)
+if tHRP and tChar and tHRP.Parent and tChar.Parent then
+aimbotNoTargetSince=nil
+if AimbotState.highlightEnabled then aimbotHighlight.Adornee=tChar end
+local tVel=tHRP.AssemblyLinearVelocity
+local predictTime=math.clamp(tVel.Magnitude/150,0.05,0.2)
+local predicted=tHRP.Position+tVel*predictTime
+local behindOffset=-tHRP.CFrame.LookVector*AimbotState.meleeOffset
+local headTopOffset=Vector3.new(0,2.6,0)
+local standPos=predicted+behindOffset+headTopOffset
+local moveDir=standPos-myHRP.Position
+local lookTarget=Vector3.new(predicted.X,myHRP.Position.Y,predicted.Z)
+if(lookTarget-myHRP.Position).Magnitude>0.1 then
+myHRP.CFrame=CFrame.lookAt(myHRP.Position,lookTarget)*CFrame.Angles(math.rad(-15),0,0)
+end
+if moveDir.Magnitude>1 then
+myHRP.AssemblyLinearVelocity=moveDir.Unit*AimbotState.speed
+else
+myHRP.AssemblyLinearVelocity=tVel
+end
+else
+if not aimbotNoTargetSince then aimbotNoTargetSince=tick()end
+if tick()-aimbotNoTargetSince>1.5 then
+aimbotLockedTarget=nil
+if myHRP and myHRP.Parent then myHRP.AssemblyLinearVelocity=Vector3.new(0,0,0)end
+if AimbotState.highlightEnabled then aimbotHighlight.Adornee=nil end
+end
+end
+end)
+end
+
+local function stopAimbot()
+if aimbotConnection then aimbotConnection:Disconnect()aimbotConnection=nil end
+local char=LP.Character
+local r=char and char:FindFirstChild("HumanoidRootPart")
+local hum=char and char:FindFirstChildOfClass("Humanoid")
+if r then r.AssemblyLinearVelocity=Vector3.zero end
+if hum then hum.AutoRotate=true end
+aimbotLockedTarget=nil
+aimbotNoTargetSince=nil
+if AimbotState.highlightEnabled then aimbotHighlight.Adornee=nil end
+end
+
+local function createUI()
+local old=LP.PlayerGui:FindFirstChild("AimbotUI")
+if old then old:Destroy()end
+local sg=Instance.new("ScreenGui")
+sg.Name="AimbotUI"
+sg.ResetOnSpawn=false
+sg.IgnoreGuiInset=true
+sg.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
+sg.Parent=LP:WaitForChild("PlayerGui")
+local mf=Instance.new("Frame")
+mf.Size=UDim2.new(0,220,0,280)
+mf.Position=UDim2.new(0.5,-110,0.5,-140)
+mf.BackgroundColor3=Color3.fromRGB(12,12,14)
+mf.BorderSizePixel=0
+mf.BackgroundTransparency=0.05
+mf.Active=true
+mf.Draggable=true
+mf.Parent=sg
+Instance.new("UICorner",mf).CornerRadius=UDim.new(0,12)
+local ms=Instance.new("UIStroke",mf)
+ms.Color=Color3.fromRGB(60,60,70)
+ms.Thickness=1.5
+local bg=Instance.new("ImageLabel",mf)
+bg.Size=UDim2.new(1,0,1,0)
+bg.BackgroundTransparency=1
+bg.Image="rbxassetid://112977078041259"
+bg.ScaleType=Enum.ScaleType.Crop
+bg.ImageTransparency=0.4
+Instance.new("UICorner",bg).CornerRadius=UDim.new(0,12)
+
+local cl=Instance.new("TextButton",mf)
+cl.Size=UDim2.new(0,28,0,28)
+cl.Position=UDim2.new(1,-36,0,6)
+cl.BackgroundColor3=Color3.fromRGB(180,60,80)
+cl.BorderSizePixel=0
+cl.Text="✕"
+cl.TextColor3=Color3.fromRGB(255,255,255)
+cl.Font=Enum.Font.GothamBold
+cl.TextSize=16
+Instance.new("UICorner",cl).CornerRadius=UDim.new(1,0)
+cl.MouseButton1Click:Connect(function()
+if AimbotState.enabled then AimbotState.enabled=false stopAimbot()end
+sg:Destroy()
+end)
+
+local dv=Instance.new("Frame",mf)
+dv.Size=UDim2.new(1,-24,0,1)
+dv.Position=UDim2.new(0,12,0,44)
+dv.BackgroundColor3=Color3.fromRGB(50,50,55)
+dv.BorderSizePixel=0
+
+local tr=Instance.new("Frame",mf)
+tr.Size=UDim2.new(1,-20,0,48)
+tr.Position=UDim2.new(0,10,0,56)
+tr.BackgroundColor3=Color3.fromRGB(22,22,26)
+tr.BorderSizePixel=0
+Instance.new("UICorner",tr).CornerRadius=UDim.new(0,8)
+Instance.new("UIStroke",tr).Color=Color3.fromRGB(40,40,45)
+
+local tp=Instance.new("Frame",tr)
+tp.Size=UDim2.new(0,44,0,24)
+tp.Position=UDim2.new(0.5,-22,0.5,-12)
+tp.BackgroundColor3=Color3.fromRGB(60,60,70)
+tp.BorderSizePixel=0
+Instance.new("UICorner",tp).CornerRadius=UDim.new(1,0)
+local td=Instance.new("Frame",tp)
+td.Size=UDim2.new(0,18,0,18)
+td.Position=UDim2.new(0,3,0.5,-9)
+td.BackgroundColor3=Color3.fromRGB(255,255,255)
+td.BorderSizePixel=0
+Instance.new("UICorner",td).CornerRadius=UDim.new(1,0)
+local tb=Instance.new("TextButton",tr)
+tb.Size=UDim2.new(1,0,1,0)
+tb.BackgroundTransparency=1
+tb.Text=""
+tb.MouseButton1Click:Connect(function()
+AimbotState.enabled=not AimbotState.enabled
+if AimbotState.enabled then startAimbot()else stopAimbot()end
+tp.BackgroundColor3=AimbotState.enabled and Color3.fromRGB(100,200,120)or Color3.fromRGB(60,60,70)
+td.Position=AimbotState.enabled and UDim2.new(1,-21,0.5,-9)or UDim2.new(0,3,0.5,-9)
+end)
+
+local function makeRow(y)
+local r=Instance.new("Frame",mf)
+r.Size=UDim2.new(1,-20,0,36)
+r.Position=UDim2.new(0,10,0,y)
+r.BackgroundColor3=Color3.fromRGB(16,16,20)
+r.BorderSizePixel=0
+Instance.new("UICorner",r).CornerRadius=UDim.new(0,6)
+local p=Instance.new("Frame",r)
+p.Size=UDim2.new(0,36,0,20)
+p.Position=UDim2.new(0.5,-18,0.5,-10)
+p.BackgroundColor3=Color3.fromRGB(60,60,70)
+p.BorderSizePixel=0
+Instance.new("UICorner",p).CornerRadius=UDim.new(1,0)
+local d=Instance.new("Frame",p)
+d.Size=UDim2.new(0,14,0,14)
+d.Position=UDim2.new(0,4,0.5,-7)
+d.BackgroundColor3=Color3.fromRGB(255,255,255)
+d.BorderSizePixel=0
+Instance.new("UICorner",d).CornerRadius=UDim.new(1,0)
+local b=Instance.new("TextButton",r)
+b.Size=UDim2.new(1,0,1,0)
+b.BackgroundTransparency=1
+b.Text=""
+return r,p,d,b
+end
+
+local sr,sp,sd,sb=makeRow(112)
+sb.MouseButton1Click:Connect(function()
+AimbotState.speed=AimbotState.speed+5
+if AimbotState.speed>150 then AimbotState.speed=30 end
+sp.BackgroundColor3=Color3.fromRGB(100,200,120)
+sd.Position=UDim2.new(1,-18,0.5,-7)
+task.wait(0.1)
+sp.BackgroundColor3=Color3.fromRGB(60,60,70)
+sd.Position=UDim2.new(0,4,0.5,-7)
+end)
+
+local or2,op2,od2,ob2=makeRow(156)
+ob2.MouseButton1Click:Connect(function()
+AimbotState.meleeOffset=AimbotState.meleeOffset+0.5
+if AimbotState.meleeOffset>5 then AimbotState.meleeOffset=0.5 end
+op2.BackgroundColor3=Color3.fromRGB(100,200,120)
+od2.Position=UDim2.new(1,-18,0.5,-7)
+task.wait(0.1)
+op2.BackgroundColor3=Color3.fromRGB(60,60,70)
+od2.Position=UDim2.new(0,4,0.5,-7)
+end)
+
+local dr,dp,dd,db=makeRow(200)
+dp.BackgroundColor3=AimbotState.autoDropBrainrot and Color3.fromRGB(100,200,120)or Color3.fromRGB(60,60,70)
+dd.Position=AimbotState.autoDropBrainrot and UDim2.new(1,-18,0.5,-7)or UDim2.new(0,4,0.5,-7)
+db.MouseButton1Click:Connect(function()
+AimbotState.autoDropBrainrot=not AimbotState.autoDropBrainrot
+dp.BackgroundColor3=AimbotState.autoDropBrainrot and Color3.fromRGB(100,200,120)or Color3.fromRGB(60,60,70)
+dd.Position=AimbotState.autoDropBrainrot and UDim2.new(1,-18,0.5,-7)or UDim2.new(0,4,0.5,-7)
+end)
+
+local hr,hp,hd,hb=makeRow(244)
+hp.BackgroundColor3=AimbotState.highlightEnabled and Color3.fromRGB(100,200,120)or Color3.fromRGB(60,60,70)
+hd.Position=AimbotState.highlightEnabled and UDim2.new(1,-18,0.5,-7)or UDim2.new(0,4,0.5,-7)
+hb.MouseButton1Click:Connect(function()
+AimbotState.highlightEnabled=not AimbotState.highlightEnabled
+hp.BackgroundColor3=AimbotState.highlightEnabled and Color3.fromRGB(100,200,120)or Color3.fromRGB(60,60,70)
+hd.Position=AimbotState.highlightEnabled and UDim2.new(1,-18,0.5,-7)or UDim2.new(0,4,0.5,-7)
+if not AimbotState.highlightEnabled then aimbotHighlight.Adornee=nil end
+end)
+
+return sg
+end
+
+_G.ToggleAimbot=function()
+local existing=LP.PlayerGui:FindFirstChild("AimbotUI")
+if existing then
+if AimbotState.enabled then AimbotState.enabled=false stopAimbot()end
+existing:Destroy()
+return
+end
+createUI()
+end
+
+UserInputService.InputBegan:Connect(function(i,g)
+if g then return end
+if i.KeyCode==Enum.KeyCode.M then
+AimbotState.enabled=not AimbotState.enabled
+if AimbotState.enabled then startAimbot()else stopAimbot()end
+local sg=LP.PlayerGui:FindFirstChild("AimbotUI")
+if sg then
+local tp=sg:FindFirstChild("Frame"):FindFirstChildOfClass("Frame")
+if tp and tp:FindFirstChildOfClass("Frame")then
+local p=tp:FindFirstChildOfClass("Frame")
+if p then
+p.BackgroundColor3=AimbotState.enabled and Color3.fromRGB(100,200,120)or Color3.fromRGB(60,60,70)
+local d=p:FindFirstChildOfClass("Frame")
+if d then
+d.Position=AimbotState.enabled and UDim2.new(1,-21,0.5,-9)or UDim2.new(0,3,0.5,-9)
+end
+end
+end
+end
+end
+end)
+
+task.wait(0.5)
+_G.ToggleAimbot()
