@@ -1,0 +1,470 @@
+-- ============================================================
+-- ORVYN BYPASS BAT (Reconstructed from image + Sakura logic)
+-- ============================================================
+local Players     = game:GetService("Players")
+local RunService  = game:GetService("RunService")
+local TweenService= game:GetService("TweenService")
+local UIS         = game:GetService("UserInputService")
+local LP          = Players.LocalPlayer
+
+local isMobile = UIS.TouchEnabled and not UIS.KeyboardEnabled
+
+-- Keybind persistence
+local keybindFile = "OrvynBypassBat_Keybind.txt"
+
+local State = {
+    enabled   = false,
+    cooldown  = false,
+    isMobileMode = isMobile,
+}
+
+-- Keybind configuration
+local KeybindSettings = {
+    toggle = Enum.KeyCode.V,
+}
+local WaitingForKeybind = false
+
+-- ============================================================
+-- Persistence
+-- ============================================================
+local function loadKeybind()
+    if isfile and isfile(keybindFile) then
+        local ok, data = pcall(function() return readfile(keybindFile) end)
+        if ok and data then
+            for _, enum in ipairs(Enum.KeyCode:GetEnumItems()) do
+                if enum.Name == data then
+                    KeybindSettings.toggle = enum
+                    break
+                end
+            end
+        end
+    end
+end
+
+local function saveKeybind()
+    if writefile then
+        pcall(function() writefile(keybindFile, KeybindSettings.toggle.Name) end)
+    end
+end
+
+loadKeybind()
+
+-- ============================================================
+-- CORE LOGIC (from Sakura Anti Bypass)
+-- ============================================================
+local function getHRP()
+    local char = LP.Character
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local function getBat()
+    local char = LP.Character
+    if not char then return nil end
+    local tool = char:FindFirstChild("Bat")
+    if tool then return tool end
+    local bp = LP:FindFirstChild("Backpack")
+    if bp then
+        tool = bp:FindFirstChild("Bat")
+        if tool then tool.Parent = char; return tool end
+    end
+    return nil
+end
+
+local function tryHitBat()
+    if State.cooldown then return end
+    State.cooldown = true
+    pcall(function()
+        local bat = getBat()
+        if bat then
+            bat:Activate()
+            local ev = bat:FindFirstChildWhichIsA("RemoteEvent")
+            if ev then ev:FireServer() end
+        end
+    end)
+    task.delay(0.08, function() State.cooldown = false end)
+end
+
+local function getClosestPlayer()
+    local hrp = getHRP()
+    if not hrp then return nil, math.huge end
+    local cp, cd = nil, math.huge
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LP and p.Character then
+            local tr = p.Character:FindFirstChild("HumanoidRootPart")
+            if tr then
+                local d = (hrp.Position - tr.Position).Magnitude
+                if d < cd then cd = d; cp = p end
+            end
+        end
+    end
+    return cp, cd
+end
+
+RunService.RenderStepped:Connect(function()
+    if not State.enabled then return end
+    local hrp = getHRP()
+    if not hrp then return end
+    local target, dist = getClosestPlayer()
+    if target and target.Character then
+        local tr = target.Character:FindFirstChild("HumanoidRootPart")
+        if tr then
+            local fp  = tr.Position + tr.CFrame.LookVector * 1.5
+            local dir = (fp - hrp.Position).Unit
+            hrp.Velocity = Vector3.new(dir.X * 56.5, dir.Y * 56.5, dir.Z * 56.5)
+            if dist <= 5 then tryHitBat() end
+        end
+    end
+end)
+
+-- Cleanup old UI
+pcall(function()
+    for _, old in ipairs(LP:WaitForChild("PlayerGui"):GetChildren()) do
+        if old.Name == "OrvynBypassBat" or old.Name == "SakuraGUI" then
+            old:Destroy()
+        end
+    end
+end)
+
+-- ============================================================
+-- UI CONSTRUCTION
+-- ============================================================
+local PW, PH = 340, 130
+local MINI_H = 50
+
+-- Color palette (dark + neon purple/magenta from image)
+local BG_DARK      = Color3.fromRGB(15, 8, 20)
+local BG_ROW       = Color3.fromRGB(20, 10, 28)
+local NEON_PURPLE  = Color3.fromRGB(190, 80, 255)
+local NEON_MAGENTA = Color3.fromRGB(230, 60, 180)
+local TEXT_WHITE   = Color3.fromRGB(255, 255, 255)
+local TEXT_MUTED   = Color3.fromRGB(180, 160, 200)
+local STATUS_OFF   = Color3.fromRGB(80, 40, 60)
+local STATUS_ON    = Color3.fromRGB(0, 255, 140)
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "OrvynBypassBat"
+gui.ResetOnSpawn = false
+gui.DisplayOrder = 999999
+gui.IgnoreGuiInset = true
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+gui.Parent = LP:WaitForChild("PlayerGui")
+
+-- Main frame
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Active = true
+MainFrame.Size = UDim2.new(0, PW, 0, PH)
+MainFrame.Position = UDim2.new(0.5, -PW/2, 0.5, -PH/2)
+MainFrame.BackgroundColor3 = BG_DARK
+MainFrame.BackgroundTransparency = 0.15
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+MainFrame.Parent = gui
+
+local mainCorner = Instance.new("UICorner", MainFrame)
+mainCorner.CornerRadius = UDim.new(0, 14)
+
+local mainStroke = Instance.new("UIStroke", MainFrame)
+mainStroke.Color = NEON_PURPLE
+mainStroke.Thickness = 1.8
+
+-- ==================== HEADER ====================
+local Header = Instance.new("Frame")
+Header.Name = "Header"
+Header.BackgroundTransparency = 1
+Header.Size = UDim2.new(1, 0, 0, 50)
+Header.BorderSizePixel = 0
+Header.Parent = MainFrame
+
+-- Title
+local Title = Instance.new("TextLabel")
+Title.Name = "Title"
+Title.BackgroundTransparency = 1
+Title.Position = UDim2.new(0, 16, 0, 0)
+Title.Size = UDim2.new(0.55, 0, 1, 0)
+Title.Font = Enum.Font.GothamBlack
+Title.Text = "ORVYN BYPASS BAT"
+Title.TextColor3 = NEON_MAGENTA
+Title.TextSize = 16
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = Header
+
+-- Mobile button
+local MobileBtn = Instance.new("TextButton")
+MobileBtn.Name = "MobileBtn"
+MobileBtn.Size = UDim2.new(0, 62, 0, 24)
+MobileBtn.Position = UDim2.new(1, -108, 0.5, -12)
+MobileBtn.BackgroundColor3 = BG_ROW
+MobileBtn.BackgroundTransparency = 0.3
+MobileBtn.Font = Enum.Font.GothamBlack
+MobileBtn.Text = "MOBILE"
+MobileBtn.TextColor3 = NEON_PURPLE
+MobileBtn.TextSize = 11
+MobileBtn.BorderSizePixel = 0
+MobileBtn.Parent = Header
+
+local mobileCorner = Instance.new("UICorner", MobileBtn)
+mobileCorner.CornerRadius = UDim.new(0, 5)
+
+local mobileStroke = Instance.new("UIStroke", MobileBtn)
+mobileStroke.Color = NEON_PURPLE
+mobileStroke.Thickness = 1
+
+-- Minimize button
+local MinBtn = Instance.new("TextButton")
+MinBtn.Name = "MinimizeBtn"
+MinBtn.Size = UDim2.new(0, 28, 0, 28)
+MinBtn.Position = UDim2.new(1, -40, 0.5, -14)
+MinBtn.BackgroundColor3 = BG_ROW
+MinBtn.BackgroundTransparency = 0.4
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.Text = "−"
+MinBtn.TextColor3 = NEON_PURPLE
+MinBtn.TextSize = 18
+MinBtn.BorderSizePixel = 0
+MinBtn.Parent = Header
+
+local minCorner = Instance.new("UICorner", MinBtn)
+minCorner.CornerRadius = UDim.new(0, 6)
+
+local minStroke = Instance.new("UIStroke", MinBtn)
+minStroke.Color = NEON_PURPLE
+minStroke.Thickness = 1
+
+-- Divider line
+local Divider = Instance.new("Frame")
+Divider.Name = "Divider"
+Divider.BackgroundColor3 = NEON_PURPLE
+Divider.BackgroundTransparency = 0.6
+Divider.Position = UDim2.new(0, 16, 0, 48)
+Divider.Size = UDim2.new(1, -32, 0, 1)
+Divider.BorderSizePixel = 0
+Divider.Parent = MainFrame
+
+-- ==================== CONTENT ROW ====================
+local Content = Instance.new("Frame")
+Content.Name = "Content"
+Content.BackgroundTransparency = 1
+Content.Position = UDim2.new(0, 16, 0, 60)
+Content.Size = UDim2.new(1, -32, 0, 50)
+Content.BorderSizePixel = 0
+Content.Parent = MainFrame
+
+-- Bypass Row
+local BypassRow = Instance.new("Frame")
+BypassRow.Name = "BypassRow"
+BypassRow.BackgroundColor3 = BG_ROW
+BypassRow.BackgroundTransparency = 0.35
+BypassRow.Size = UDim2.new(1, 0, 0, 44)
+BypassRow.BorderSizePixel = 0
+BypassRow.Parent = Content
+
+local rowCorner = Instance.new("UICorner", BypassRow)
+rowCorner.CornerRadius = UDim.new(0, 10)
+
+local rowStroke = Instance.new("UIStroke", BypassRow)
+rowStroke.Color = NEON_PURPLE
+rowStroke.Thickness = 1.3
+
+-- Row label
+local RowLabel = Instance.new("TextLabel")
+RowLabel.Name = "RowLabel"
+RowLabel.BackgroundTransparency = 1
+RowLabel.Position = UDim2.new(0, 16, 0, 0)
+RowLabel.Size = UDim2.new(0.5, 0, 1, 0)
+RowLabel.Font = Enum.Font.GothamBold
+RowLabel.Text = "Bypass Bat V2"
+RowLabel.TextColor3 = TEXT_WHITE
+RowLabel.TextSize = 14
+RowLabel.TextXAlignment = Enum.TextXAlignment.Left
+RowLabel.Parent = BypassRow
+
+-- Keybind Button
+local KeybindBtn = Instance.new("TextButton")
+KeybindBtn.Name = "KeybindBtn"
+KeybindBtn.Size = UDim2.new(0, 70, 0, 24)
+KeybindBtn.Position = UDim2.new(1, -140, 0.5, -12)
+KeybindBtn.BackgroundColor3 = Color3.fromRGB(35, 15, 40)
+KeybindBtn.BackgroundTransparency = 0.2
+KeybindBtn.Font = Enum.Font.GothamBlack
+KeybindBtn.Text = KeybindSettings.toggle.Name
+KeybindBtn.TextColor3 = NEON_MAGENTA
+KeybindBtn.TextSize = 11
+KeybindBtn.BorderSizePixel = 0
+KeybindBtn.Parent = BypassRow
+
+local kbCorner = Instance.new("UICorner", KeybindBtn)
+kbCorner.CornerRadius = UDim.new(0, 5)
+
+local kbStroke = Instance.new("UIStroke", KeybindBtn)
+kbStroke.Color = NEON_MAGENTA
+kbStroke.Thickness = 1
+
+-- Toggle Pill
+local Pill = Instance.new("Frame")
+Pill.Name = "Pill"
+Pill.Size = UDim2.new(0, 50, 0, 24)
+Pill.Position = UDim2.new(1, -62, 0.5, -12)
+Pill.BackgroundColor3 = STATUS_OFF
+Pill.BorderSizePixel = 0
+Pill.Parent = BypassRow
+
+local pillCorner = Instance.new("UICorner", Pill)
+pillCorner.CornerRadius = UDim.new(1, 0)
+
+local pillStroke = Instance.new("UIStroke", Pill)
+pillStroke.Color = NEON_MAGENTA
+pillStroke.Thickness = 1.4
+
+-- Toggle Knob
+local Knob = Instance.new("Frame")
+Knob.Name = "Knob"
+Knob.Size = UDim2.new(0, 18, 0, 18)
+Knob.Position = UDim2.new(0, 3, 0.5, -9)
+Knob.BackgroundColor3 = Color3.fromRGB(120, 60, 100)
+Knob.BorderSizePixel = 0
+Knob.Parent = Pill
+
+local knobCorner = Instance.new("UICorner", Knob)
+knobCorner.CornerRadius = UDim.new(1, 0)
+
+-- Invisible click overlay for the toggle pill
+local PillClick = Instance.new("TextButton")
+PillClick.Name = "PillClick"
+PillClick.BackgroundTransparency = 1
+PillClick.Size = UDim2.new(1, 0, 1, 0)
+PillClick.Text = ""
+PillClick.ZIndex = 5
+PillClick.Parent = Pill
+
+-- ============================================================
+-- TWEEN / VISUAL LOGIC
+-- ============================================================
+local ti = TweenInfo.new(0.2, Enum.EasingStyle.Quad)
+local tiBack = TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+
+local function setToggle(on)
+    State.enabled = on
+    TweenService:Create(Pill, ti, {BackgroundColor3 = on and NEON_MAGENTA or STATUS_OFF}):Play()
+    TweenService:Create(pillStroke, ti, {Color = on and STATUS_ON or NEON_MAGENTA}):Play()
+    TweenService:Create(Knob, tiBack, {
+        Position = on and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9),
+        BackgroundColor3 = on and TEXT_WHITE or Color3.fromRGB(120, 60, 100)
+    }):Play()
+    TweenService:Create(rowStroke, ti, {Color = on and STATUS_ON or NEON_PURPLE}):Play()
+end
+
+local function updateKeybindDisplay()
+    KeybindBtn.Text = WaitingForKeybind and "..." or KeybindSettings.toggle.Name
+end
+
+-- ============================================================
+-- MINIMIZE
+-- ============================================================
+local isMinimized = false
+MinBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    local target = isMinimized and MINI_H or PH
+    TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, PW, 0, target)
+    }):Play()
+    Content.Visible = not isMinimized
+    Divider.Visible = not isMinimized
+    MinBtn.Text = isMinimized and "+" or "−"
+end)
+
+-- ============================================================
+-- MOBILE BUTTON (toggles mobile mode indicator / activates toggle via touch)
+-- ============================================================
+MobileBtn.MouseButton1Click:Connect(function()
+    State.isMobileMode = not State.isMobileMode
+    if State.isMobileMode then
+        MobileBtn.TextColor3 = STATUS_ON
+        mobileStroke.Color = STATUS_ON
+    else
+        MobileBtn.TextColor3 = NEON_PURPLE
+        mobileStroke.Color = NEON_PURPLE
+    end
+end)
+
+-- ============================================================
+-- PILL TOGGLE CLICK
+-- ============================================================
+PillClick.MouseButton1Click:Connect(function()
+    setToggle(not State.enabled)
+end)
+
+-- ============================================================
+-- KEYBIND BUTTON (rebind)
+-- ============================================================
+KeybindBtn.MouseButton1Click:Connect(function()
+    if WaitingForKeybind then return end
+    WaitingForKeybind = true
+    updateKeybindDisplay()
+end)
+
+-- ============================================================
+-- INPUT HANDLING (rebind + toggle)
+-- ============================================================
+UIS.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if WaitingForKeybind and input.UserInputType == Enum.UserInputType.Keyboard then
+        if input.KeyCode ~= Enum.KeyCode.Unknown then
+            KeybindSettings.toggle = input.KeyCode
+            WaitingForKeybind = false
+            updateKeybindDisplay()
+            saveKeybind()
+        end
+    elseif not WaitingForKeybind and input.UserInputType == Enum.UserInputType.Keyboard then
+        if input.KeyCode == KeybindSettings.toggle then
+            setToggle(not State.enabled)
+        end
+    end
+end)
+
+-- ============================================================
+-- DRAG (from header)
+-- ============================================================
+do
+    local dragging, dragStart, startPos = false, nil, nil
+    Header.InputBegan:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1
+        or inp.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = inp.Position
+            startPos = MainFrame.Position
+            inp.Changed:Connect(function()
+                if inp.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    UIS.InputChanged:Connect(function(inp)
+        if not dragging then return end
+        if inp.UserInputType == Enum.UserInputType.MouseMovement
+        or inp.UserInputType == Enum.UserInputType.Touch then
+            local dx = inp.Position.X - dragStart.X
+            local dy = inp.Position.Y - dragStart.Y
+            MainFrame.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + dx,
+                startPos.Y.Scale, startPos.Y.Offset + dy
+            )
+        end
+    end)
+end
+
+-- ============================================================
+-- INIT
+-- ============================================================
+updateKeybindDisplay()
+setToggle(false)
+
+-- Auto-detect mobile mode
+if isMobile then
+    MobileBtn.TextColor3 = STATUS_ON
+    mobileStroke.Color = STATUS_ON
+    State.isMobileMode = true
+end
+
+print("ORVYN BYPASS BAT - Loaded!")
