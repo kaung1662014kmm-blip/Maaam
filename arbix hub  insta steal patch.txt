@@ -1,0 +1,565 @@
+local UserInputService = game:GetService("UserInputService")
+local UICorner = Instance.new("UICorner", Frame)
+UICorner.CornerRadius = UDim.new(0, 12)
+local UIStroke = Instance.new("UIStroke", Frame)
+UIStroke.Thickness = 2
+UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+local UIGradient = Instance.new("UIGradient", UIStroke)
+UIGradient.Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)), ColorSequenceKeypoint.new(0.16, Color3.fromRGB(255, 255, 0)), ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)), ColorSequenceKeypoint.new(0.66, Color3.fromRGB(0, 0, 255)), ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)) })
+local UIGradient2 = Instance.new("UIGradient", Frame)
+UIGradient2.Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)), ColorSequenceKeypoint.new(0.16, Color3.fromRGB(255, 255, 0)), ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)), ColorSequenceKeypoint.new(0.66, Color3.fromRGB(0, 0, 255)), ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)) })
+task.spawn(function(...)
+	UIGradient2.Rotation = 1
+	UIGradient.Rotation = 1.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 2
+	UIGradient.Rotation = 3
+	task.wait(0.03)
+	UIGradient2.Rotation = 3
+	UIGradient.Rotation = 4.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 4
+	UIGradient.Rotation = 6
+	task.wait(0.03)
+	UIGradient2.Rotation = 5
+	UIGradient.Rotation = 7.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 6
+	UIGradient.Rotation = 9
+	task.wait(0.03)
+	UIGradient2.Rotation = 7
+	UIGradient.Rotation = 10.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 8
+	UIGradient.Rotation = 12
+	task.wait(0.03)
+	UIGradient2.Rotation = 9
+	UIGradient.Rotation = 13.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 10
+	UIGradient.Rotation = 15
+	task.wait(0.03)
+	UIGradient2.Rotation = 11
+	UIGradient.Rotation = 16.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 12
+	UIGradient.Rotation = 18
+	task.wait(0.03)
+	UIGradient2.Rotation = 13
+	UIGradient.Rotation = 19.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 14
+	UIGradient.Rotation = 21
+	task.wait(0.03)
+	UIGradient2.Rotation = 15
+	UIGradient.Rotation = 22.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 16
+	UIGradient.Rotation = 24
+	task.wait(0.03)
+	UIGradient2.Rotation = 17
+	UIGradient.Rotation = 25.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 18
+	UIGradient.Rotation = 27
+	task.wait(0.03)
+	UIGradient2.Rotation = 19
+	UIGradient.Rotation = 28.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 20
+	UIGradient.Rotation = 30
+	task.wait(0.03)
+	UIGradient2.Rotation = 21
+	UIGradient.Rotation = 31.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 22
+	UIGradient.Rotation = 33
+	task.wait(0.03)
+	UIGradient2.Rotation = 23
+	UIGradient.Rotation = 34.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 24
+	UIGradient.Rotation = 36
+	task.wait(0.03)
+	UIGradient2.Rotation = 25
+	UIGradient.Rotation = 37.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 26
+	UIGradient.Rotation = 39
+	task.wait(0.03)
+	UIGradient2.Rotation = 27
+	UIGradient.Rotation = 40.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 28
+	UIGradient.Rotation = 42
+	task.wait(0.03)
+	UIGradient2.Rotation = 29
+	UIGradient.Rotation = 43.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 30
+	UIGradient.Rotation = 45
+	task.wait(0.03)
+	UIGradient2.Rotation = 31
+	UIGradient.Rotation = 46.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 32
+	UIGradient.Rotation = 48
+	task.wait(0.03)
+	UIGradient2.Rotation = 33
+	UIGradient.Rotation = 49.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 34
+	UIGradient.Rotation = 51
+	task.wait(0.03)
+	UIGradient2.Rotation = 35
+	UIGradient.Rotation = 52.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 36
+	UIGradient.Rotation = 54
+	task.wait(0.03)
+	UIGradient2.Rotation = 37
+	UIGradient.Rotation = 55.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 38
+	UIGradient.Rotation = 57
+	task.wait(0.03)
+	UIGradient2.Rotation = 39
+	UIGradient.Rotation = 58.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 40
+	UIGradient.Rotation = 60
+	task.wait(0.03)
+	UIGradient2.Rotation = 41
+	UIGradient.Rotation = 61.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 42
+	UIGradient.Rotation = 63
+	task.wait(0.03)
+	UIGradient2.Rotation = 43
+	UIGradient.Rotation = 64.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 44
+	UIGradient.Rotation = 66
+	task.wait(0.03)
+	UIGradient2.Rotation = 45
+	UIGradient.Rotation = 67.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 46
+	UIGradient.Rotation = 69
+	task.wait(0.03)
+	UIGradient2.Rotation = 47
+	UIGradient.Rotation = 70.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 48
+	UIGradient.Rotation = 72
+	task.wait(0.03)
+	UIGradient2.Rotation = 49
+	UIGradient.Rotation = 73.5
+	task.wait(0.03)
+	UIGradient2.Rotation = 50
+	UIGradient.Rotation = 75
+	task.wait(0.03)
+	UIGradient2.Rotation = 51
+	UIGradient.Rotation = 76.5
+	task.wait(0.03)
+end)
+local TextButton = Instance.new("TextButton", Frame)
+TextButton.Size = UDim2.new(1, -40, 0, 35)
+TextButton.Position = UDim2.new(0, 20, 0, 50)
+TextButton.Text = "Instant Steal"
+TextButton.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+TextButton.TextColor3 = Color3.new(1, 1, 1)
+TextButton.Font = Enum.Font.GothamBold
+TextButton.TextSize = 16
+local UICorner2 = Instance.new("UICorner", TextButton)
+UICorner2.CornerRadius = UDim.new(0, 10)
+local UIGradient3 = Instance.new("UIGradient", TextButton)
+UIGradient3.Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)), ColorSequenceKeypoint.new(0.16, Color3.fromRGB(255, 255, 0)), ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)), ColorSequenceKeypoint.new(0.66, Color3.fromRGB(0, 0, 255)), ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)) })
+task.spawn(function(...)
+	UIGradient3.Rotation = 3
+	task.wait(0.03)
+	UIGradient3.Rotation = 6
+	task.wait(0.03)
+	UIGradient3.Rotation = 9
+	task.wait(0.03)
+	UIGradient3.Rotation = 12
+	task.wait(0.03)
+	UIGradient3.Rotation = 15
+	task.wait(0.03)
+	UIGradient3.Rotation = 18
+	task.wait(0.03)
+	UIGradient3.Rotation = 21
+	task.wait(0.03)
+	UIGradient3.Rotation = 24
+	task.wait(0.03)
+	UIGradient3.Rotation = 27
+	task.wait(0.03)
+	UIGradient3.Rotation = 30
+	task.wait(0.03)
+	UIGradient3.Rotation = 33
+	task.wait(0.03)
+	UIGradient3.Rotation = 36
+	task.wait(0.03)
+	UIGradient3.Rotation = 39
+	task.wait(0.03)
+	UIGradient3.Rotation = 42
+	task.wait(0.03)
+	UIGradient3.Rotation = 45
+	task.wait(0.03)
+	UIGradient3.Rotation = 48
+	task.wait(0.03)
+	UIGradient3.Rotation = 51
+	task.wait(0.03)
+	UIGradient3.Rotation = 54
+	task.wait(0.03)
+	UIGradient3.Rotation = 57
+	task.wait(0.03)
+	UIGradient3.Rotation = 60
+	task.wait(0.03)
+	UIGradient3.Rotation = 63
+	task.wait(0.03)
+	UIGradient3.Rotation = 66
+	task.wait(0.03)
+	UIGradient3.Rotation = 69
+	task.wait(0.03)
+	UIGradient3.Rotation = 72
+	task.wait(0.03)
+	UIGradient3.Rotation = 75
+	task.wait(0.03)
+	UIGradient3.Rotation = 78
+	task.wait(0.03)
+	UIGradient3.Rotation = 81
+	task.wait(0.03)
+	UIGradient3.Rotation = 84
+	task.wait(0.03)
+	UIGradient3.Rotation = 87
+	task.wait(0.03)
+	UIGradient3.Rotation = 90
+	task.wait(0.03)
+	UIGradient3.Rotation = 93
+	task.wait(0.03)
+	UIGradient3.Rotation = 96
+	task.wait(0.03)
+	UIGradient3.Rotation = 99
+	task.wait(0.03)
+	UIGradient3.Rotation = 102
+	task.wait(0.03)
+	UIGradient3.Rotation = 105
+	task.wait(0.03)
+	UIGradient3.Rotation = 108
+	task.wait(0.03)
+	UIGradient3.Rotation = 111
+	task.wait(0.03)
+	UIGradient3.Rotation = 114
+	task.wait(0.03)
+	UIGradient3.Rotation = 117
+	task.wait(0.03)
+	UIGradient3.Rotation = 120
+	task.wait(0.03)
+	UIGradient3.Rotation = 123
+	task.wait(0.03)
+	UIGradient3.Rotation = 126
+	task.wait(0.03)
+	UIGradient3.Rotation = 129
+	task.wait(0.03)
+	UIGradient3.Rotation = 132
+	task.wait(0.03)
+	UIGradient3.Rotation = 135
+	task.wait(0.03)
+	UIGradient3.Rotation = 138
+	task.wait(0.03)
+	UIGradient3.Rotation = 141
+	task.wait(0.03)
+	UIGradient3.Rotation = 144
+	task.wait(0.03)
+	UIGradient3.Rotation = 147
+	task.wait(0.03)
+	UIGradient3.Rotation = 150
+	task.wait(0.03)
+	UIGradient3.Rotation = 153
+	task.wait(0.03)
+end)
+local TextButton2 = Instance.new("TextButton", Frame)
+TextButton2.Size = UDim2.new(1, -40, 0, 35)
+TextButton2.Position = UDim2.new(0, 20, 0, 90)
+TextButton2.Text = "TP Forward"
+TextButton2.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+TextButton2.TextColor3 = Color3.new(1, 1, 1)
+TextButton2.Font = Enum.Font.GothamBold
+TextButton2.TextSize = 16
+local UICorner3 = Instance.new("UICorner", TextButton2)
+UICorner3.CornerRadius = UDim.new(0, 10)
+local UIGradient4 = Instance.new("UIGradient", TextButton2)
+UIGradient4.Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)), ColorSequenceKeypoint.new(0.16, Color3.fromRGB(255, 255, 0)), ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)), ColorSequenceKeypoint.new(0.66, Color3.fromRGB(0, 0, 255)), ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)) })
+task.spawn(function(...)
+	UIGradient4.Rotation = 3
+	task.wait(0.03)
+	UIGradient4.Rotation = 6
+	task.wait(0.03)
+	UIGradient4.Rotation = 9
+	task.wait(0.03)
+	UIGradient4.Rotation = 12
+	task.wait(0.03)
+	UIGradient4.Rotation = 15
+	task.wait(0.03)
+	UIGradient4.Rotation = 18
+	task.wait(0.03)
+	UIGradient4.Rotation = 21
+	task.wait(0.03)
+	UIGradient4.Rotation = 24
+	task.wait(0.03)
+	UIGradient4.Rotation = 27
+	task.wait(0.03)
+	UIGradient4.Rotation = 30
+	task.wait(0.03)
+	UIGradient4.Rotation = 33
+	task.wait(0.03)
+	UIGradient4.Rotation = 36
+	task.wait(0.03)
+	UIGradient4.Rotation = 39
+	task.wait(0.03)
+	UIGradient4.Rotation = 42
+	task.wait(0.03)
+	UIGradient4.Rotation = 45
+	task.wait(0.03)
+	UIGradient4.Rotation = 48
+	task.wait(0.03)
+	UIGradient4.Rotation = 51
+	task.wait(0.03)
+	UIGradient4.Rotation = 54
+	task.wait(0.03)
+	UIGradient4.Rotation = 57
+	task.wait(0.03)
+	UIGradient4.Rotation = 60
+	task.wait(0.03)
+	UIGradient4.Rotation = 63
+	task.wait(0.03)
+	UIGradient4.Rotation = 66
+	task.wait(0.03)
+	UIGradient4.Rotation = 69
+	task.wait(0.03)
+	UIGradient4.Rotation = 72
+	task.wait(0.03)
+	UIGradient4.Rotation = 75
+	task.wait(0.03)
+	UIGradient4.Rotation = 78
+	task.wait(0.03)
+	UIGradient4.Rotation = 81
+	task.wait(0.03)
+	UIGradient4.Rotation = 84
+	task.wait(0.03)
+	UIGradient4.Rotation = 87
+	task.wait(0.03)
+	UIGradient4.Rotation = 90
+	task.wait(0.03)
+	UIGradient4.Rotation = 93
+	task.wait(0.03)
+	UIGradient4.Rotation = 96
+	task.wait(0.03)
+	UIGradient4.Rotation = 99
+	task.wait(0.03)
+	UIGradient4.Rotation = 102
+	task.wait(0.03)
+	UIGradient4.Rotation = 105
+	task.wait(0.03)
+	UIGradient4.Rotation = 108
+	task.wait(0.03)
+	UIGradient4.Rotation = 111
+	task.wait(0.03)
+	UIGradient4.Rotation = 114
+	task.wait(0.03)
+	UIGradient4.Rotation = 117
+	task.wait(0.03)
+	UIGradient4.Rotation = 120
+	task.wait(0.03)
+	UIGradient4.Rotation = 123
+	task.wait(0.03)
+	UIGradient4.Rotation = 126
+	task.wait(0.03)
+	UIGradient4.Rotation = 129
+	task.wait(0.03)
+	UIGradient4.Rotation = 132
+	task.wait(0.03)
+	UIGradient4.Rotation = 135
+	task.wait(0.03)
+	UIGradient4.Rotation = 138
+	task.wait(0.03)
+	UIGradient4.Rotation = 141
+	task.wait(0.03)
+	UIGradient4.Rotation = 144
+	task.wait(0.03)
+	UIGradient4.Rotation = 147
+	task.wait(0.03)
+	UIGradient4.Rotation = 150
+	task.wait(0.03)
+	UIGradient4.Rotation = 153
+	task.wait(0.03)
+end)
+local TextButton3 = Instance.new("TextButton", Frame)
+TextButton3.Size = UDim2.new(1, -40, 0, 35)
+TextButton3.Position = UDim2.new(0, 20, 0, 130)
+TextButton3.Text = "Go to your base"
+TextButton3.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+TextButton3.TextColor3 = Color3.new(1, 1, 1)
+TextButton3.Font = Enum.Font.GothamBold
+TextButton3.TextSize = 16
+local UICorner4 = Instance.new("UICorner", TextButton3)
+UICorner4.CornerRadius = UDim.new(0, 10)
+local UIGradient5 = Instance.new("UIGradient", TextButton3)
+UIGradient5.Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)), ColorSequenceKeypoint.new(0.16, Color3.fromRGB(255, 255, 0)), ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)), ColorSequenceKeypoint.new(0.66, Color3.fromRGB(0, 0, 255)), ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)) })
+task.spawn(function(...)
+	UIGradient5.Rotation = 3
+	task.wait(0.03)
+	UIGradient5.Rotation = 6
+	task.wait(0.03)
+	UIGradient5.Rotation = 9
+	task.wait(0.03)
+	UIGradient5.Rotation = 12
+	task.wait(0.03)
+	UIGradient5.Rotation = 15
+	task.wait(0.03)
+	UIGradient5.Rotation = 18
+	task.wait(0.03)
+	UIGradient5.Rotation = 21
+	task.wait(0.03)
+	UIGradient5.Rotation = 24
+	task.wait(0.03)
+	UIGradient5.Rotation = 27
+	task.wait(0.03)
+	UIGradient5.Rotation = 30
+	task.wait(0.03)
+	UIGradient5.Rotation = 33
+	task.wait(0.03)
+	UIGradient5.Rotation = 36
+	task.wait(0.03)
+	UIGradient5.Rotation = 39
+	task.wait(0.03)
+	UIGradient5.Rotation = 42
+	task.wait(0.03)
+	UIGradient5.Rotation = 45
+	task.wait(0.03)
+	UIGradient5.Rotation = 48
+	task.wait(0.03)
+	UIGradient5.Rotation = 51
+	task.wait(0.03)
+	UIGradient5.Rotation = 54
+	task.wait(0.03)
+	UIGradient5.Rotation = 57
+	task.wait(0.03)
+	UIGradient5.Rotation = 60
+	task.wait(0.03)
+	UIGradient5.Rotation = 63
+	task.wait(0.03)
+	UIGradient5.Rotation = 66
+	task.wait(0.03)
+	UIGradient5.Rotation = 69
+	task.wait(0.03)
+	UIGradient5.Rotation = 72
+	task.wait(0.03)
+	UIGradient5.Rotation = 75
+	task.wait(0.03)
+	UIGradient5.Rotation = 78
+	task.wait(0.03)
+	UIGradient5.Rotation = 81
+	task.wait(0.03)
+	UIGradient5.Rotation = 84
+	task.wait(0.03)
+	UIGradient5.Rotation = 87
+	task.wait(0.03)
+	UIGradient5.Rotation = 90
+	task.wait(0.03)
+	UIGradient5.Rotation = 93
+	task.wait(0.03)
+	UIGradient5.Rotation = 96
+	task.wait(0.03)
+	UIGradient5.Rotation = 99
+	task.wait(0.03)
+	UIGradient5.Rotation = 102
+	task.wait(0.03)
+	UIGradient5.Rotation = 105
+	task.wait(0.03)
+	UIGradient5.Rotation = 108
+	task.wait(0.03)
+	UIGradient5.Rotation = 111
+	task.wait(0.03)
+	UIGradient5.Rotation = 114
+	task.wait(0.03)
+	UIGradient5.Rotation = 117
+	task.wait(0.03)
+	UIGradient5.Rotation = 120
+	task.wait(0.03)
+	UIGradient5.Rotation = 123
+	task.wait(0.03)
+	UIGradient5.Rotation = 126
+	task.wait(0.03)
+	UIGradient5.Rotation = 129
+	task.wait(0.03)
+	UIGradient5.Rotation = 132
+	task.wait(0.03)
+	UIGradient5.Rotation = 135
+	task.wait(0.03)
+	UIGradient5.Rotation = 138
+	task.wait(0.03)
+	UIGradient5.Rotation = 141
+	task.wait(0.03)
+	UIGradient5.Rotation = 144
+	task.wait(0.03)
+	UIGradient5.Rotation = 147
+	task.wait(0.03)
+	UIGradient5.Rotation = 150
+	task.wait(0.03)
+	UIGradient5.Rotation = 153
+	task.wait(0.03)
+end)
+TextButton.MouseButton1Click:Connect(function()
+	local Players = game:GetService("Players")
+	local HumanoidRootPart = Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	local Humanoid = Players.LocalPlayer.Character:FindFirstChildWhichIsA("Humanoid")
+	Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+	HumanoidRootPart.CFrame = (HumanoidRootPart.CFrame + Vector3.new(0, 75, 0))
+	task.wait(0.07)
+	HumanoidRootPart.CFrame = CFrame.new(0, -9999999999, 0)
+	task.wait(0.26)
+	HumanoidRootPart.CFrame = ((HumanoidRootPart.CFrame + (HumanoidRootPart.CFrame.LookVector * 3)) + Vector3.new(0, 3, 0))
+	task.wait(0.05)
+	Humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+end)
+TextButton2.MouseButton1Click:Connect(function()
+	local HumanoidRootPart2 = Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	local Humanoid2 = Players.LocalPlayer.Character:FindFirstChildWhichIsA("Humanoid")
+	Humanoid2:ChangeState(Enum.HumanoidStateType.Jumping)
+	HumanoidRootPart2.CFrame = (HumanoidRootPart2.CFrame + (HumanoidRootPart2.CFrame.LookVector * 4))
+	task.wait(0.07)
+	HumanoidRootPart2.CFrame = CFrame.new(0, -9999999999, 0)
+	task.wait(0.26)
+	HumanoidRootPart2.CFrame = ((HumanoidRootPart2.CFrame + (HumanoidRootPart2.CFrame.LookVector * 3)) + Vector3.new(0, 3, 0))
+	task.wait(0.05)
+	Humanoid2:ChangeState(Enum.HumanoidStateType.Freefall)
+end)
+TextButton3.MouseButton1Click:Connect(function()
+	local RunService = game:GetService("RunService")
+	local HumanoidRootPart3 = Players.LocalPlayer.Character:WaitForChild("HumanoidRootPart")
+	local Humanoid3 = Players.LocalPlayer.Character:FindFirstChildWhichIsA("Humanoid")
+	local Plots = workspace:FindFirstChild("Plots")
+	local children = Plots:GetChildren()
+	for k, v in pairs(children) do
+		local PlotSign = v:FindFirstChild("PlotSign")
+		PlotSign:FindFirstChild("YourBase")
+		local DeliveryHitbox = v:FindFirstChild("DeliveryHitbox")
+		HumanoidRootPart3:FindFirstChild("FloatVelocity")
+		HumanoidRootPart3.FloatVelocity:Destroy()
+		Humanoid3:ChangeState(Enum.HumanoidStateType.Physics)
+		local BodyVelocity = Instance.new("BodyVelocity")
+		BodyVelocity.Name = "FloatVelocity"
+		BodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+		BodyVelocity.Velocity = Vector3.new(0, 0, 0)
+		BodyVelocity.Parent = HumanoidRootPart3
+		RunService.Heartbeat:Connect(function(deltaTime)
+			BodyVelocity.Velocity = ((DeliveryHitbox.Position - HumanoidRootPart3.Position).Unit * 38)
+		end)
+	end
+end)
+end)
+end)
+UserInputService.InputChanged:Connect(function(input3, gameProcessed3)
+end)
