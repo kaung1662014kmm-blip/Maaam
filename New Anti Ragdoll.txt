@@ -1,0 +1,73 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+local antiRagdollEnabled = false
+local resetCooldown = 0
+local connection = nil
+
+local function forceReset()
+    local char = player.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not hum or not root or hum.Health <= 0 then return end
+
+    pcall(function()
+        hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+        root.Velocity = Vector3.zero
+        root.RotVelocity = Vector3.zero
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+
+        for _, obj in ipairs(char:GetDescendants()) do
+            if obj:IsA("Motor6D") then obj.Enabled = true end
+            if obj:IsA("Constraint") then obj.Enabled = true end
+        end
+
+        workspace.CurrentCamera.CameraSubject = hum
+
+        local PM = player.PlayerScripts:FindFirstChild("PlayerModule")
+        if PM then
+            local CM = require(PM:FindFirstChild("ControlModule"))
+            if CM then CM:Enable() end
+        end
+
+        hum.AutoRotate = true
+        hum.PlatformStand = false
+        hum.Sit = false
+    end)
+end
+
+local function startAntiRagdoll()
+    if connection then return end
+    antiRagdollEnabled = true
+    connection = RunService.Heartbeat:Connect(function()
+        if not antiRagdollEnabled then return end
+        local char = player.Character
+        if not char then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then return end
+
+        local state = hum:GetState()
+        local isRagdolled = (state == Enum.HumanoidStateType.Physics or
+                             state == Enum.HumanoidStateType.Ragdoll or
+                             state == Enum.HumanoidStateType.FallingDown)
+
+        if isRagdolled then
+            local now = tick()
+            if now - resetCooldown > 0.15 then
+                resetCooldown = now
+                forceReset()
+            end
+        end
+    end)
+end
+
+local function stopAntiRagdoll()
+    antiRagdollEnabled = false
+    if connection then
+        connection:Disconnect()
+        connection = nil
+    end
+end
