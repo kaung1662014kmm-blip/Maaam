@@ -1,0 +1,661 @@
+-- clean leak by prince︱.gg/freesource
+
+local TITLE = "TIGY'S SPEED BOOST"
+local IS_MOBILE = game:GetService("UserInputService").TouchEnabled and not game:GetService("UserInputService").KeyboardEnabled
+local POSKEY = IS_MOBILE and "panelPosMobile" or "panelPos"
+local CFG_FILE = "TigySpeedBoost.json"
+
+local Players          = game:GetService("Players")
+local RunService       = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService     = game:GetService("TweenService")
+local HttpService      = game:GetService("HttpService")
+local CoreGui          = game:GetService("CoreGui")
+
+local LP = Players.LocalPlayer
+if not LP then
+    repeat task.wait() until Players.LocalPlayer
+    LP = Players.LocalPlayer
+end
+
+if _G.TigySpeedBoostCleanup then pcall(_G.TigySpeedBoostCleanup) end
+
+local Cfg = {
+    speed = 36,
+    boost = false,
+    autoSteal = true,
+    potionOnSteal = true,
+    mountOnSteal = false,
+    mount = "Auto",
+    inputMode = "Slider",
+    panelPos = nil,
+    panelPosMobile = nil,
+}
+pcall(function()
+    if isfile and isfile(CFG_FILE) then
+        local d = HttpService:JSONDecode(readfile(CFG_FILE))
+        if type(d) == "table" then for k, v in pairs(d) do Cfg[k] = v end end
+    end
+end)
+local function saveCfg()
+    pcall(function() if writefile then writefile(CFG_FILE, HttpService:JSONEncode(Cfg)) end end)
+end
+Cfg.speed = math.clamp(tonumber(Cfg.speed) or 36, 16, 100)  
+
+local conns, guis = {}, {}
+local function track(c) conns[#conns + 1] = c; return c end
+
+local boostOn = false          
+_G.speedBoostEnabled = false
+local autoStarted = false      
+local AD = { dieOn = false, dropOn = false, heart = nil, deathConns = {}, charConn = nil, mt = nil, oldIdx = nil, oldNew = nil, spoof = Vector3.zero }
+
+local function protectChar(character)
+    if not character then return end
+    local hum = character:WaitForChild("Humanoid", 5)
+    if not hum then return end
+    hum.MaxHealth = math.huge
+    hum.Health = math.huge
+    AD.deathConns[#AD.deathConns + 1] = hum.StateChanged:Connect(function(_, new)
+        if not AD.dieOn then return end
+        if new == Enum.HumanoidStateType.Dead then
+            hum.Health = math.huge
+            hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+        end
+    end)
+    hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+    AD.deathConns[#AD.deathConns + 1] = hum:GetPropertyChangedSignal("Health"):Connect(function()
+        if AD.dieOn and hum.Health < hum.MaxHealth then hum.Health = math.huge end
+    end)
+    if AD.heart then AD.heart:Disconnect() end
+    AD.heart = RunService.Heartbeat:Connect(function()
+        if AD.dieOn and hum and hum.Parent and hum.Health < hum.MaxHealth then hum.Health = math.huge end
+    end)
+end
+local function startAntiDie()
+    if AD.dieOn then return end
+    AD.dieOn = true
+    for _, c in ipairs(AD.deathConns) do pcall(function() c:Disconnect() end) end
+    AD.deathConns = {}
+    if AD.charConn then AD.charConn:Disconnect() end
+    protectChar(LP.Character)
+    AD.charConn = LP.CharacterAdded:Connect(function(c)
+        if not AD.dieOn then return end
+        task.wait(0.1)
+        for _, c2 in ipairs(AD.deathConns) do pcall(function() c2:Disconnect() end) end
+        AD.deathConns = {}
+        protectChar(c)
+    end)
+end
+local function stopAntiDie()
+    if not AD.dieOn then return end
+    AD.dieOn = false
+    for _, c in ipairs(AD.deathConns) do pcall(function() c:Disconnect() end) end
+    AD.deathConns = {}
+    if AD.heart then AD.heart:Disconnect(); AD.heart = nil end
+    if AD.charConn then AD.charConn:Disconnect(); AD.charConn = nil end
+    local char = LP.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        pcall(function()
+            hum:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
+            hum.MaxHealth = 100
+            hum.Health = 100
+        end)
+    end
+end
+local function startAntiDrop()
+    if AD.dropOn then return end
+    if type(getrawmetatable) ~= "function" or type(newcclosure) ~= "function" or type(checkcaller) ~= "function" then return end
+    local ok, mt = pcall(getrawmetatable, game)
+    if not ok or not mt then return end
+    AD.mt, AD.oldIdx, AD.oldNew = mt, mt.__index, mt.__newindex
+    pcall(setreadonly, mt, false)
+    mt.__index = newcclosure(function(self, key)
+        if not checkcaller() and (key == "AssemblyLinearVelocity" or key == "Velocity")
+            and typeof(self) == "Instance" and self:IsA("BasePart") and self.Name == "HumanoidRootPart"
+            and LP.Character and self:IsDescendantOf(LP.Character) then
+            return AD.spoof
+        end
+        return AD.oldIdx(self, key)
+    end)
+    mt.__newindex = newcclosure(function(self, key, value)
+        if not checkcaller() and (key == "AssemblyLinearVelocity" or key == "Velocity")
+            and typeof(self) == "Instance" and self:IsA("BasePart") and self.Name == "HumanoidRootPart"
+            and LP.Character and self:IsDescendantOf(LP.Character) then
+            AD.spoof = value
+            return
+        end
+        return AD.oldNew(self, key, value)
+    end)
+    pcall(setreadonly, mt, true)
+    AD.dropOn = true
+end
+local function stopAntiDrop()
+    if not AD.dropOn then return end
+    if AD.mt and AD.oldIdx then
+        pcall(setreadonly, AD.mt, false)
+        AD.mt.__index = AD.oldIdx
+        AD.mt.__newindex = AD.oldNew
+        pcall(setreadonly, AD.mt, true)
+    end
+    AD.oldIdx, AD.oldNew = nil, nil
+    AD.dropOn = false
+end
+
+local charConns = {}
+local function clearCharConns()
+    for _, c in ipairs(charConns) do pcall(function() c:Disconnect() end) end
+    charConns = {}
+end
+local function initBoost(char)
+    clearCharConns()
+    local hum = char:WaitForChild("Humanoid", 5)
+    local hrp = char:WaitForChild("HumanoidRootPart", 5)
+    if not (hum and hrp) then return end
+    local was = false
+    charConns[#charConns + 1] = RunService.Heartbeat:Connect(function()
+        if not char.Parent or not hum.Parent or not hrp.Parent then return end
+        if _G.speedBoostEnabled == true then
+            was = true
+            hum.UseJumpPower = true
+            hum.JumpPower = 40
+            if hum.MoveDirection.Magnitude > 0 then
+                local flat = Vector3.new(hum.MoveDirection.X, 0, hum.MoveDirection.Z).Unit
+                hrp.Velocity = Vector3.new(flat.X * Cfg.speed, hrp.Velocity.Y, flat.Z * Cfg.speed)
+            end
+        elseif was then
+            was = false
+            hum.JumpPower = 50
+        end
+    end)
+end
+track(LP.CharacterAdded:Connect(function(c) task.spawn(initBoost, c) end))
+if LP.Character then task.spawn(initBoost, LP.Character) end
+
+local setBoostVisual   
+local function setBoost(on, fromAuto)
+    on = on and true or false
+    if boostOn == on then return end
+    boostOn = on
+    _G.speedBoostEnabled = on
+    Cfg.boost = on
+    if not fromAuto then autoStarted = false end
+    if on then startAntiDie(); startAntiDrop() else stopAntiDie(); stopAntiDrop() end
+    if setBoostVisual then setBoostVisual(on) end
+    saveCfg()
+end
+
+local function clean(s) return (tostring(s):lower():gsub("[%s'%_%-]", "")) end
+
+local function findPotion()
+    local function scan(c)
+        if not c then return nil end
+        local exact = c:FindFirstChild("Giant Potion")
+        if exact and exact:IsA("Tool") then return exact end
+        for _, t in ipairs(c:GetChildren()) do
+            if t:IsA("Tool") and clean(t.Name):find("giantpotion", 1, true) then return t end
+        end
+        return nil
+    end
+    return scan(LP.Character) or scan(LP:FindFirstChild("Backpack"))
+end
+
+local function usePotion(stillCarrying)
+    for _ = 1, 10 do
+        if stillCarrying and not stillCarrying() then return end
+        local char = LP.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then
+            task.wait(0.15)
+        else
+            local potion = findPotion()
+            if not potion then return end                       
+            if potion.Parent ~= char then
+                pcall(function() hum:EquipTool(potion) end)
+                local t0 = os.clock()
+                while potion.Parent ~= char and potion.Parent ~= nil and os.clock() - t0 < 0.7 do task.wait(0.03) end
+                task.wait(0.08)
+            end
+            if potion.Parent == char then pcall(function() potion:Activate() end) end
+            local t1 = os.clock()
+            while potion.Parent ~= nil and os.clock() - t1 < 0.35 do task.wait(0.05) end
+            if potion.Parent == nil then return end             
+        end
+    end
+end
+
+local MOUNTS = { "Flying Carpet", "FlyingCarpet", "Witch's Broom", "Witch'sBroom", "WitchBroom", "Cupid's Wings", "Cupid'sWings",
+    "CupidWings", "Santa's Sleigh", "Santa'sSleigh", "SantaSleigh", "Waverider" }
+local function findTool(container, name)
+    if not container or not name then return nil end
+    local exact = container:FindFirstChild(name)
+    if exact and exact:IsA("Tool") then return exact end
+    local want = clean(name)
+    for _, ch in ipairs(container:GetChildren()) do
+        if ch:IsA("Tool") and clean(ch.Name) == want then return ch end
+    end
+end
+local function ownedMounts()
+    local out, seen = {}, {}
+    local function scan(c)
+        if not c then return end
+        for _, t in ipairs(c:GetChildren()) do
+            if t:IsA("Tool") then
+                for _, m in ipairs(MOUNTS) do
+                    if clean(m) == clean(t.Name) and not seen[t.Name] then seen[t.Name] = true; out[#out + 1] = t.Name end
+                end
+            end
+        end
+    end
+    scan(LP:FindFirstChild("Backpack")); scan(LP.Character)
+    return out
+end
+local function equipMount()
+    local char = LP.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    local function equip(name)
+        local t = findTool(char, name) or findTool(LP:FindFirstChild("Backpack"), name)
+        if t then
+            if t.Parent ~= char then pcall(function() hum:EquipTool(t) end) end
+            return true
+        end
+    end
+    if Cfg.mount ~= "Auto" and Cfg.mount ~= "" and equip(Cfg.mount) then return end
+    for _, m in ipairs(MOUNTS) do if equip(m) then return end end
+end
+
+
+local PromptService = game:GetService("ProximityPromptService")
+local POTION_LEAD = 0.15        
+local lastPotionAt = -100
+local function drinkPotion(force)
+    if not Cfg.potionOnSteal then return end
+    if not force and os.clock() - lastPotionAt < 6 then return end   
+    lastPotionAt = os.clock()
+    task.spawn(usePotion, nil)
+end
+local function isStealPrompt(p)
+    local st = p:GetAttribute("State")
+    local a = p.ActionText
+    return st == "Steal" or st == "Grab" or a == "Steal" or a == "Grab"
+end
+local holdToken = 0
+track(PromptService.PromptButtonHoldBegan:Connect(function(prompt, plr)
+    if plr and plr ~= LP then return end
+    if not Cfg.potionOnSteal or LP:GetAttribute("Stealing") == true or not isStealPrompt(prompt) then return end
+    holdToken = holdToken + 1
+    local my = holdToken
+    task.spawn(function()
+        local char = LP.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local potion = findPotion()
+        if hum and potion and potion.Parent ~= char then pcall(function() hum:EquipTool(potion) end) end
+    end)
+    local hd = tonumber(prompt.HoldDuration) or 1.3
+    if hd <= 0 then hd = 1.3 end
+    task.delay(math.max(hd - POTION_LEAD, 0), function()
+        if my == holdToken and LP:GetAttribute("Stealing") ~= true then drinkPotion(false) end
+    end)
+end))
+track(PromptService.PromptButtonHoldEnded:Connect(function(prompt, plr)
+    if plr and plr ~= LP then return end
+    holdToken = holdToken + 1     
+end))
+
+local pickupToken = 0
+local function onStealChanged()
+    local carrying = LP:GetAttribute("Stealing") == true
+    pickupToken = pickupToken + 1
+    local my = pickupToken
+    if carrying then
+        if Cfg.autoSteal and not boostOn then
+            autoStarted = true
+            setBoost(true, true)
+        end
+        drinkPotion(false)   
+        if Cfg.mountOnSteal then
+            task.spawn(function()
+                task.wait(Cfg.potionOnSteal and 1.2 or 0.15)   
+                if my == pickupToken then equipMount() end
+            end)
+        end
+    else
+        if autoStarted and boostOn then
+            autoStarted = false
+            setBoost(false, true)
+        end
+    end
+end
+track(LP:GetAttributeChangedSignal("Stealing"):Connect(onStealChanged))
+track(LP.CharacterAdded:Connect(function() task.defer(onStealChanged) end))
+
+local GREEN   = Color3.fromRGB(80, 208, 120)
+local WHITE   = Color3.fromRGB(255, 255, 255)
+local GREY    = Color3.fromRGB(135, 135, 142)
+local FONT    = Enum.Font.GothamMedium
+local FONTB   = Enum.Font.GothamBold
+
+local function mk(class, props, parent)
+    local o = Instance.new(class)
+    for k, v in pairs(props) do o[k] = v end
+    if parent then o.Parent = parent end
+    return o
+end
+local function corner(o, r) return mk("UICorner", { CornerRadius = r }, o) end
+local PILL = UDim.new(1, 0)
+local function tween(o, props, t) TweenService:Create(o, TweenInfo.new(t or 0.15, Enum.EasingStyle.Quad), props):Play() end
+
+local host = (gethui and gethui()) or CoreGui
+local function newGui(name, order)
+    local sg = mk("ScreenGui", { Name = name, ResetOnSpawn = false, IgnoreGuiInset = true, DisplayOrder = order, ZIndexBehavior = Enum.ZIndexBehavior.Sibling }, nil)
+    local ok = pcall(function() sg.Parent = host end)
+    if not ok or not sg.Parent then sg.Parent = LP:WaitForChild("PlayerGui") end
+    guis[#guis + 1] = sg
+    return sg
+end
+for _, par in ipairs({ host, LP:FindFirstChild("PlayerGui") }) do
+    pcall(function()
+        for _, n in ipairs({ "TigySpeedBoostPanel", "TigySpeedBoostSettings" }) do
+            local old = par and par:FindFirstChild(n)
+            if old then old:Destroy() end
+        end
+    end)
+end
+
+local function makeSwitch(parent, w, h, state, onChange, offBg)
+    local off = offBg or Color3.fromRGB(70, 70, 76)
+    local sw = mk("TextButton", { Size = UDim2.fromOffset(w, h), BackgroundColor3 = state and GREEN or off,
+        Text = "", AutoButtonColor = false, BorderSizePixel = 0 }, parent)
+    corner(sw, PILL)
+    local pad = math.floor(h * 0.1)
+    local kd = h - pad * 2
+    local knob = mk("Frame", { Size = UDim2.fromOffset(kd, kd), BackgroundColor3 = WHITE, BorderSizePixel = 0,
+        Position = UDim2.fromOffset(state and (w - kd - pad) or pad, pad) }, sw)
+    corner(knob, PILL)
+    local cur = state and true or false
+    local api = {}
+    function api.set(v, instant)
+        cur = v and true or false
+        local pos = UDim2.fromOffset(cur and (w - kd - pad) or pad, pad)
+        local col = cur and GREEN or off
+        if instant then knob.Position = pos; sw.BackgroundColor3 = col
+        else tween(knob, { Position = pos }); tween(sw, { BackgroundColor3 = col }) end
+    end
+    function api.get() return cur end
+    sw.MouseButton1Click:Connect(function()
+        api.set(not cur)
+        if onChange then onChange(cur) end
+    end)
+    api.frame = sw
+    return api
+end
+
+local panelGui = newGui("TigySpeedBoostPanel", 999990)
+
+local PANEL_W, PILL_H = 460, 90
+local panel = mk("Frame", { Name = "Panel", AnchorPoint = Vector2.new(1, 0), Size = UDim2.fromOffset(PANEL_W, PILL_H + 36),
+    Position = Cfg[POSKEY] and UDim2.new(Cfg[POSKEY][1], Cfg[POSKEY][2], Cfg[POSKEY][3], Cfg[POSKEY][4])
+        or (IS_MOBILE and UDim2.new(1, -8, 0, 4) or UDim2.new(1, -56, 0, 22)),
+    BackgroundTransparency = 1 }, panelGui)
+local panelScale = mk("UIScale", { Scale = 1 }, panel)
+
+local titleBar = mk("Frame", { Size = UDim2.new(1, 0, 0, 34), BackgroundTransparency = 1, Active = true }, panel)
+mk("TextLabel", { Size = UDim2.new(1, -60, 1, 0), Position = UDim2.fromOffset(18, 0), BackgroundTransparency = 1, Text = TITLE,
+    Font = FONTB, TextSize = 19, TextColor3 = WHITE, TextXAlignment = Enum.TextXAlignment.Left }, titleBar)
+local gear = mk("TextButton", { Size = UDim2.fromOffset(34, 34), Position = UDim2.new(1, -40, 0, 0), BackgroundTransparency = 1,
+    Text = "\u{2699}", Font = FONTB, TextSize = 30, TextColor3 = WHITE, AutoButtonColor = false }, titleBar)
+
+local pill = mk("Frame", { Size = UDim2.fromOffset(PANEL_W, PILL_H), Position = UDim2.fromOffset(0, 36),
+    BackgroundColor3 = Color3.fromRGB(12, 12, 14), BackgroundTransparency = 0.08, BorderSizePixel = 0 }, panel)
+corner(pill, UDim.new(0, 45))
+mk("UIStroke", { Thickness = 2, Color = Color3.fromRGB(235, 235, 240), Transparency = 0.72 }, pill)
+
+local holder = mk("Frame", { Size = UDim2.fromOffset(300, PILL_H), Position = UDim2.fromOffset(34, 0), BackgroundTransparency = 1 }, pill)
+
+local SL_MIN, SL_MAX = 16, 100
+local sliderTrack = mk("Frame", { Size = UDim2.new(1, -20, 0, 8), Position = UDim2.new(0, 10, 0.5, 6), BackgroundColor3 = Color3.fromRGB(58, 58, 64), BorderSizePixel = 0 }, holder)
+corner(sliderTrack, PILL)
+local fill = mk("Frame", { Size = UDim2.new(0, 0, 1, 0), BackgroundColor3 = GREEN, BorderSizePixel = 0 }, sliderTrack)
+corner(fill, PILL)
+local knob = mk("Frame", { Size = UDim2.fromOffset(26, 26), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0, 0, 0.5, 0),
+    BackgroundColor3 = WHITE, BorderSizePixel = 0, ZIndex = 3 }, sliderTrack)
+corner(knob, PILL)
+local valueLbl = mk("TextLabel", { Size = UDim2.fromOffset(50, 18), AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0, 0, 0, -12),
+    BackgroundTransparency = 1, Text = "", Font = FONT, TextSize = 15, TextColor3 = WHITE, ZIndex = 3 }, sliderTrack)
+local hit = mk("TextButton", { Size = UDim2.new(1, 20, 0, 44), Position = UDim2.new(0, -10, 0.5, -22), BackgroundTransparency = 1, Text = "", ZIndex = 4 }, sliderTrack)
+
+local box = mk("TextBox", { Size = UDim2.new(1, -20, 0, 42), Position = UDim2.new(0, 10, 0.5, -21), BackgroundColor3 = Color3.fromRGB(32, 32, 36),
+    Text = tostring(Cfg.speed), PlaceholderText = "speed", Font = FONT, TextSize = 18, TextColor3 = WHITE, ClearTextOnFocus = false,
+    BorderSizePixel = 0, Visible = false }, holder)
+corner(box, PILL)
+
+local function refreshSlider()
+    local a = math.clamp((Cfg.speed - SL_MIN) / (SL_MAX - SL_MIN), 0, 1)
+    fill.Size = UDim2.new(a, 0, 1, 0)
+    knob.Position = UDim2.new(a, 0, 0.5, 0)
+    valueLbl.Position = UDim2.new(a, 0, 0, -12)
+    valueLbl.Text = tostring(math.floor(Cfg.speed + 0.5))
+    box.Text = tostring(math.floor(Cfg.speed + 0.5))
+end
+local function setSpeed(v)
+    Cfg.speed = math.clamp(math.floor(v + 0.5), 16, 100)
+    refreshSlider()
+end
+local dragging = false
+local function fromX(x)
+    local a = math.clamp((x - sliderTrack.AbsolutePosition.X) / math.max(sliderTrack.AbsoluteSize.X, 1), 0, 1)
+    setSpeed(SL_MIN + a * (SL_MAX - SL_MIN))
+end
+hit.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        fromX(i.Position.X)
+    end
+end)
+track(UserInputService.InputChanged:Connect(function(i)
+    if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then fromX(i.Position.X) end
+end))
+track(UserInputService.InputEnded:Connect(function(i)
+    if dragging and (i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch) then
+        dragging = false
+        saveCfg()
+    end
+end))
+box.FocusLost:Connect(function()
+    local n = tonumber(box.Text)
+    if n then setSpeed(n) else refreshSlider() end
+    saveCfg()
+end)
+local function applyInputMode()
+    local slider = Cfg.inputMode ~= "Box"
+    sliderTrack.Visible = slider
+    box.Visible = not slider
+end
+
+local mainSwitch = makeSwitch(pill, 86, 48, false, function(v) setBoost(v, false) end, Color3.fromRGB(22, 22, 25))
+mainSwitch.frame.Position = UDim2.new(1, -108, 0.5, -24)
+mk("UIStroke", { Thickness = 2, Color = Color3.fromRGB(235, 235, 240), Transparency = 0.72 }, mainSwitch.frame)
+setBoostVisual = function(on) mainSwitch.set(on) end
+
+do
+    local d, startIn, startPos
+    titleBar.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            d, startIn, startPos = true, i.Position, panel.Position
+        end
+    end)
+    track(UserInputService.InputChanged:Connect(function(i)
+        if d and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+            local dl = i.Position - startIn
+            panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + dl.X, startPos.Y.Scale, startPos.Y.Offset + dl.Y)
+        end
+    end))
+    track(UserInputService.InputEnded:Connect(function(i)
+        if d and (i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch) then
+            d = false
+            local p = panel.Position
+            Cfg[POSKEY] = { p.X.Scale, p.X.Offset, p.Y.Scale, p.Y.Offset }
+            saveCfg()
+        end
+    end))
+end
+
+local setGui = newGui("TigySpeedBoostSettings", 999991)
+setGui.Enabled = false
+
+local WIN_W, WIN_H = 463, 340
+local win = mk("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.fromOffset(WIN_W, WIN_H),
+    BackgroundColor3 = Color3.fromRGB(23, 23, 26), BackgroundTransparency = 0.02, BorderSizePixel = 0, Active = true }, setGui)
+corner(win, UDim.new(0, 30))
+local winScale = mk("UIScale", { Scale = 1 }, win)
+mk("UIStroke", { Thickness = 1.5, Color = Color3.fromRGB(235, 235, 240), Transparency = 0.88 }, win)
+
+local winTitle = mk("TextLabel", { Size = UDim2.new(1, 0, 0, 40), Position = UDim2.fromOffset(0, 12), BackgroundTransparency = 1, Text = "Settings",
+    Font = FONTB, TextSize = 21, TextColor3 = WHITE, Active = true }, win)
+local closeBtn = mk("TextButton", { Size = UDim2.fromOffset(36, 36), Position = UDim2.new(1, -50, 0, 14), BackgroundTransparency = 1, Text = "X",
+    Font = FONTB, TextSize = 22, TextColor3 = Color3.fromRGB(170, 170, 176), AutoButtonColor = false }, win)
+closeBtn.MouseEnter:Connect(function() tween(closeBtn, { TextColor3 = WHITE }) end)
+closeBtn.MouseLeave:Connect(function() tween(closeBtn, { TextColor3 = Color3.fromRGB(170, 170, 176) }) end)
+closeBtn.MouseButton1Click:Connect(function() setGui.Enabled = false end)
+
+do
+    local d, startIn, startPos
+    winTitle.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            d, startIn, startPos = true, i.Position, win.Position
+        end
+    end)
+    track(UserInputService.InputChanged:Connect(function(i)
+        if d and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+            local dl = i.Position - startIn
+            win.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + dl.X, startPos.Y.Scale, startPos.Y.Offset + dl.Y)
+        end
+    end))
+    track(UserInputService.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then d = false end
+    end))
+end
+
+local function segmented(parent, pos, size, options, selected, onPick)
+    local bar = mk("Frame", { Position = pos, Size = size, BackgroundColor3 = Color3.fromRGB(14, 14, 16), BorderSizePixel = 0 }, parent)
+    corner(bar, PILL)
+    local btns = {}
+    local n = #options
+    local function paint(sel)
+        for name, b in pairs(btns) do
+            local on = name == sel
+            tween(b.sel, { BackgroundTransparency = on and 0 or 1 })
+            tween(b.lbl, { TextColor3 = on and WHITE or GREY })
+        end
+    end
+    for idx, name in ipairs(options) do
+        local b = mk("TextButton", { Size = UDim2.new(1 / n, -6, 1, -8), Position = UDim2.new((idx - 1) / n, 3 + (idx == 1 and 1 or 0), 0, 4),
+            BackgroundTransparency = 1, Text = "", AutoButtonColor = false }, bar)
+        local selF = mk("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(42, 42, 47), BackgroundTransparency = 1, BorderSizePixel = 0 }, b)
+        corner(selF, PILL)
+        local lbl = mk("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = name, Font = FONT, TextSize = 17,
+            TextColor3 = GREY, ZIndex = 2 }, b)
+        btns[name] = { sel = selF, lbl = lbl }
+        b.MouseButton1Click:Connect(function() paint(name); if onPick then onPick(name) end end)
+    end
+    paint(selected)
+    return { paint = paint, bar = bar }
+end
+
+local TAB_W = WIN_W - 80
+local pages = {
+    Stealing = mk("Frame", { Position = UDim2.fromOffset(0, 128), Size = UDim2.new(1, 0, 1, -128), BackgroundTransparency = 1 }, win),
+    Grapple  = mk("Frame", { Position = UDim2.fromOffset(0, 128), Size = UDim2.new(1, 0, 1, -128), BackgroundTransparency = 1, Visible = false }, win),
+}
+local tabs
+tabs = segmented(win, UDim2.fromOffset(40, 70), UDim2.fromOffset(TAB_W, 50), { "Stealing", "Grapple" }, "Stealing", function(name)
+    for n, p in pairs(pages) do p.Visible = (n == name) end
+end)
+
+local function row(page, y, text, getv, setv)
+    mk("TextLabel", { Size = UDim2.new(1, -170, 0, 40), Position = UDim2.fromOffset(40, y), BackgroundTransparency = 1, Text = text, Font = FONT,
+        TextSize = 18, TextColor3 = Color3.fromRGB(225, 225, 230), TextXAlignment = Enum.TextXAlignment.Left }, page)
+    local sw = makeSwitch(page, 68, 38, getv(), function(v) setv(v); saveCfg() end)
+    sw.frame.Position = UDim2.new(1, -108, 0, y + 1)
+    return sw
+end
+
+row(pages.Stealing, 0, "Auto Steal", function() return Cfg.autoSteal end, function(v) Cfg.autoSteal = v end)
+row(pages.Stealing, 50, "Potion On Steal", function() return Cfg.potionOnSteal end, function(v) Cfg.potionOnSteal = v end)
+segmented(pages.Stealing, UDim2.fromOffset(40, 110), UDim2.fromOffset(TAB_W, 46), { "Box", "Slider" }, Cfg.inputMode == "Box" and "Box" or "Slider", function(name)
+    Cfg.inputMode = name
+    applyInputMode()
+    saveCfg()
+end)
+
+row(pages.Grapple, 0, "Equip Mount On Steal", function() return Cfg.mountOnSteal end, function(v) Cfg.mountOnSteal = v end)
+do
+    mk("TextLabel", { Size = UDim2.new(1, -170, 0, 40), Position = UDim2.fromOffset(40, 50), BackgroundTransparency = 1, Text = "Mount",
+        Font = FONT, TextSize = 18, TextColor3 = Color3.fromRGB(225, 225, 230), TextXAlignment = Enum.TextXAlignment.Left }, pages.Grapple)
+    local mountBtn = mk("TextButton", { Size = UDim2.fromOffset(150, 38), Position = UDim2.new(1, -190, 0, 51), BackgroundColor3 = Color3.fromRGB(14, 14, 16),
+        Text = Cfg.mount, Font = FONT, TextSize = 16, TextColor3 = WHITE, AutoButtonColor = false, BorderSizePixel = 0 }, pages.Grapple)
+    corner(mountBtn, PILL)
+    mountBtn.MouseButton1Click:Connect(function()
+        local list = { "Auto" }
+        for _, m in ipairs(ownedMounts()) do list[#list + 1] = m end
+        local idx = 1
+        for i, m in ipairs(list) do if m == Cfg.mount then idx = i end end
+        Cfg.mount = list[(idx % #list) + 1]
+        mountBtn.Text = Cfg.mount
+        saveCfg()
+    end)
+end
+
+gear.MouseButton1Click:Connect(function() setGui.Enabled = not setGui.Enabled end)
+
+
+local alive = true
+task.spawn(function()
+    local last = nil
+    while alive do
+        local on = _G.speedBoostEnabled == true
+        if on ~= last then
+            last = on
+            boostOn = on
+            if on then startAntiDie(); startAntiDrop() else stopAntiDie(); stopAntiDrop() end
+            if setBoostVisual then setBoostVisual(on) end
+        end
+        task.wait(0.25)
+    end
+end)
+
+local function fit()
+    local cam = workspace.CurrentCamera
+    local vp = cam and cam.ViewportSize or Vector2.new(1280, 720)
+    if IS_MOBILE then
+        panelScale.Scale = math.clamp(vp.X * 0.5 / PANEL_W, 0.45, 0.9)
+        winScale.Scale = math.clamp(math.min(vp.X * 0.9 / WIN_W, vp.Y * 0.88 / WIN_H), 0.45, 0.95)
+    else
+        panelScale.Scale = math.clamp(vp.X / 1920, 0.8, 1)
+        winScale.Scale = math.clamp(math.min(vp.X / 1000, vp.Y / 600), 0.8, 1)
+    end
+end
+fit()
+do
+    local cam = workspace.CurrentCamera
+    if cam then track(cam:GetPropertyChangedSignal("ViewportSize"):Connect(fit)) end
+end
+
+refreshSlider()
+applyInputMode()
+if Cfg.boost then setBoost(true, false) end
+mainSwitch.set(boostOn, true)
+onStealChanged()
+
+_G.TigySpeedBoostCleanup = function()
+    alive = false
+    boostOn = false
+    _G.speedBoostEnabled = false
+    stopAntiDie(); stopAntiDrop()
+    clearCharConns()
+    for _, c in ipairs(conns) do pcall(function() c:Disconnect() end) end
+    for _, g in ipairs(guis) do pcall(function() g:Destroy() end) end
+    _G.TigySpeedBoostCleanup = nil
+end
