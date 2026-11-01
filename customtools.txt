@@ -1,0 +1,530 @@
+
+local Players          = game:GetService("Players")
+local RunService       = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local LP = Players.LocalPlayer
+
+local BAT_SKIN_NAME    = "BlueSaber"     -- DiamondSword / Katana / BlueSaber
+local MEDUSA_SKIN_NAME = "MagicOrb"      -- DesertEagle / Skull / BlueOrb / MagicOrb
+
+local BLUE      = Color3.fromRGB(0, 170, 255)
+local BLUE_NEON = Color3.fromRGB(80, 220, 255)
+
+local SKINS = {
+    DiamondSword = {
+        mesh    = "rbxassetid://8827558932",
+        texture = "rbxassetid://8827558969",
+        scale   = Vector3.new(0.2, 0.2, 0.2),
+        c0      = CFrame.new(-0.05, -0.1, -0.12) * CFrame.Angles(math.rad(90), math.rad(180), 300),
+    },
+    Katana = {
+        mesh    = "rbxassetid://13528902482",
+        texture = "rbxassetid://13528902373",
+        scale   = Vector3.new(1.4, 1.4, 1.4),
+        c0      = CFrame.new(0, 0.6, 0) * CFrame.Angles(math.rad(270), math.rad(180), math.rad(180)),
+    },
+    BlueSaber = {
+        mesh    = "rbxassetid://8827558932",
+        texture = "",
+        scale   = Vector3.new(0.22, 0.35, 0.22),
+        c0      = CFrame.new(-0.05, -0.1, -0.12) * CFrame.Angles(math.rad(90), math.rad(180), 300),
+        color   = BLUE,
+        material = Enum.Material.Neon,
+        addTrail = true,
+    },
+
+    DesertEagle = {
+        mesh    = "rbxassetid://430251413",
+        texture = "rbxassetid://435840335",
+        scale   = Vector3.new(0.01, 0.01, 0.01),
+        c0      = CFrame.new(0, 0, -0.8) * CFrame.Angles(math.rad(330), math.rad(180), 0),
+    },
+    Skull = {
+        mesh    = "rbxassetid://2050312704",
+        texture = "rbxassetid://2050313393",
+        scale   = Vector3.new(1, 1, 1),
+        c0      = CFrame.new(0, 0.65, -0.4) * CFrame.Angles(math.rad(330), 0, 0),
+    },
+    BlueOrb = {
+        mesh    = "rbxassetid://430251413",
+        texture = "",
+        scale   = Vector3.new(0.02, 0.02, 0.02),
+        c0      = CFrame.new(0, 0, -0.8) * CFrame.Angles(math.rad(330), math.rad(180), 0),
+        color   = BLUE,
+        material = Enum.Material.Neon,
+        addTrail = true,
+    },
+
+    MagicOrb = {
+        shape    = Enum.PartType.Ball,
+        size     = 0.75,                       -- حجم الكرة (صغير نسبياً)
+        c0       = CFrame.new(0, -0.05, 0),    -- داخل الـ Handle
+        color    = BLUE,
+        material = Enum.Material.Neon,
+        transparency = 0.1,
+        addTrail = true,
+        addLight = true,
+        addParticles = true,
+        addCore = true,
+        coreSize = 0.35,                       -- حجم الكرة الداخلية البيضاء
+    },
+}
+
+local SOUNDS = {
+    Bat    = { id = "rbxassetid://5713085119", skip = 0.2 },
+    Medusa = { id = "rbxassetid://3102797479", doublePlay = true, delay = 0.5 },
+}
+
+local enabled       = false
+local tracked       = setmetatable({}, {__mode = "k"})
+local watchers      = setmetatable({}, {__mode = "k"})
+local pendingHandle = setmetatable({}, {__mode = "k"})
+local hookedSounds  = setmetatable({}, {__mode = "k"})
+
+local function isReplica(d)
+    if d.Name == "LocalReplica" then return true end
+    return d:FindFirstAncestor("LocalReplica") ~= nil
+end
+
+local function matchItem(tool)
+    if not tool:IsA("Tool") then return nil end
+    local n = tool.Name:lower()
+    if n:find("bat") or n:find("slap") then return "Bat" end
+    if n:find("medusa") then return "Medusa" end
+    return nil
+end
+
+local function hidePart(entry, d)
+    if isReplica(d) then return end
+    if d:IsA("BasePart") or d:IsA("Decal") or d:IsA("Texture") then
+        if entry.hidden[d] ~= nil then return end
+        entry.hidden[d] = d.Transparency
+        pcall(function() d.Transparency = 1 end)
+    end
+end
+
+local function buildReplica(handle, skinData)
+    local existing = handle:FindFirstChild("LocalReplica")
+    if existing then pcall(function() existing:Destroy() end) end
+
+    local m = Instance.new("Model")
+    m.Name = "LocalReplica"
+
+    local p = Instance.new("Part")
+    p.Name        = "MainPart"
+    p.CanCollide  = false
+    p.CanQuery    = false
+    p.CanTouch    = false
+    p.Massless    = true
+    p.Anchored    = false
+    p.Locked      = true
+
+    if skinData.shape == Enum.PartType.Ball then
+        p.Shape = Enum.PartType.Ball
+        local s = skinData.size or 0.75
+        p.Size = Vector3.new(s, s, s)
+    else
+        p.Size = Vector3.new(1, 1, 1)
+    end
+
+    if skinData.color then
+        p.Color        = skinData.color
+        p.Material     = skinData.material or Enum.Material.Neon
+        p.Transparency = skinData.transparency or 0.1
+    else
+        p.Transparency = 0
+    end
+
+    p.Parent = m
+
+    if skinData.mesh and skinData.mesh ~= "" then
+        pcall(function()
+            local mesh = Instance.new("SpecialMesh")
+            mesh.MeshType  = Enum.MeshType.FileMesh
+            mesh.MeshId    = skinData.mesh
+            if skinData.texture and skinData.texture ~= "" then
+                mesh.TextureId = skinData.texture
+            end
+            mesh.Scale = skinData.scale or Vector3.new(1, 1, 1)
+            mesh.Parent = p
+        end)
+    end
+
+    local ok, err = pcall(function()
+        local w = Instance.new("Weld")
+        w.Name   = "ReplicaWeld"
+        w.Part0  = handle
+        w.Part1  = p
+        w.C0     = skinData.c0
+        w.Parent = p
+    end)
+
+    if not ok then
+        warn("[Custom Tools] Weld failed:", err)
+        pcall(function() m:Destroy() end)
+        return nil
+    end
+
+    if skinData.addCore then
+        pcall(function()
+            local core = Instance.new("Part")
+            core.Name        = "OrbCore"
+            core.Shape       = Enum.PartType.Ball
+            local cs = skinData.coreSize or 0.35
+            core.Size        = Vector3.new(cs, cs, cs)
+            core.Color       = Color3.fromRGB(255, 255, 255)
+            core.Material    = Enum.Material.Neon
+            core.Transparency = 0
+            core.CanCollide  = false
+            core.CanQuery    = false
+            core.CanTouch    = false
+            core.Massless    = true
+            core.Anchored    = false
+            core.Locked      = true
+
+            local coreW = Instance.new("Weld")
+            coreW.Name   = "CoreWeld"
+            coreW.Part0  = p
+            coreW.Part1  = core
+            coreW.C0     = CFrame.new(0, 0, 0)
+            coreW.Parent = core
+
+            core.Parent = m
+
+            local coreLight = Instance.new("PointLight")
+            coreLight.Color      = skinData.color or BLUE
+            coreLight.Range      = 10
+            coreLight.Brightness = 5
+            coreLight.Shadows    = false
+            coreLight.Parent     = core
+        end)
+    end
+
+    if skinData.addLight and not skinData.addCore then
+        pcall(function()
+            local light = Instance.new("PointLight")
+            light.Color      = skinData.color or BLUE
+            light.Range      = 10
+            light.Brightness = 4
+            light.Shadows    = false
+            light.Parent     = p
+        end)
+    end
+
+    if skinData.addTrail then
+        pcall(function()
+            local a0 = Instance.new("Attachment")
+            a0.Name = "TrailA0"
+            a0.Position = Vector3.new(0, 0.3, 0)
+            a0.Parent = p
+
+            local a1 = Instance.new("Attachment")
+            a1.Name = "TrailA1"
+            a1.Position = Vector3.new(0, -0.3, 0)
+            a1.Parent = p
+
+            local trail = Instance.new("Trail")
+            trail.Attachment0 = a0
+            trail.Attachment1 = a1
+            trail.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, skinData.color or BLUE),
+                ColorSequenceKeypoint.new(1, BLUE_NEON),
+            })
+            trail.Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 0.2),
+                NumberSequenceKeypoint.new(1, 1),
+            })
+            trail.Lifetime      = 0.4
+            trail.LightEmission = 0.9
+            trail.Parent        = p
+        end)
+    end
+
+    if skinData.addParticles then
+        pcall(function()
+            local emitter = Instance.new("ParticleEmitter")
+            emitter.Name = "MagicParticles"
+            emitter.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, skinData.color or BLUE),
+                ColorSequenceKeypoint.new(1, BLUE_NEON),
+            })
+            emitter.LightEmission = 1
+            emitter.Size = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 0.1),
+                NumberSequenceKeypoint.new(1, 0),
+            })
+            emitter.Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 0),
+                NumberSequenceKeypoint.new(1, 1),
+            })
+            emitter.Lifetime  = NumberRange.new(0.5, 0.9)
+            emitter.Rate      = 15
+            emitter.Speed     = NumberRange.new(0.5, 1.5)
+            emitter.SpreadAngle = Vector2.new(180, 180)
+            emitter.EmissionDirection = Enum.NormalId.Top
+            emitter.Parent = p
+        end)
+    end
+
+    m.Parent = handle
+    return m
+end
+
+local function hookSound(entry, snd)
+    if not snd:IsA("Sound") then return end
+    if snd.Name == "CustomSound" then return end
+    if hookedSounds[snd] then return end
+    if entry.muted[snd] ~= nil then return end
+
+    entry.muted[snd] = snd.Volume
+    hookedSounds[snd] = true
+
+    local function trigger()
+        if not enabled then return end
+        if snd.Playing or snd.TimePosition > 0 then
+            pcall(function()
+                snd.Volume = 0
+                snd:Stop()
+            end)
+            local cs = entry.sound
+            if cs and cs.Parent then
+                local d = entry.soundData
+                if entry.timer then
+                    pcall(task.cancel, entry.timer)
+                    entry.timer = nil
+                end
+                pcall(function()
+                    cs:Stop()
+                    cs.TimePosition = d.skip or 0
+                    cs.Volume = 1
+                    cs:Play()
+                end)
+                if d.doublePlay and d.delay then
+                    entry.timer = task.delay(d.delay, function()
+                        entry.timer = nil
+                        if enabled and cs and cs.Parent then
+                            pcall(function()
+                                cs:Stop()
+                                cs.TimePosition = d.skip or 0
+                                cs.Volume = 1
+                                cs:Play()
+                            end)
+                        end
+                    end)
+                end
+            end
+        end
+    end
+
+    local c1 = snd:GetPropertyChangedSignal("Playing"):Connect(trigger)
+    local c2 = snd:GetPropertyChangedSignal("TimePosition"):Connect(trigger)
+    table.insert(entry.conns, c1)
+    table.insert(entry.conns, c2)
+
+    local c3
+    c3 = snd.AncestryChanged:Connect(function(_, parent)
+        if parent then return end
+        pcall(function() c1:Disconnect() end)
+        pcall(function() c2:Disconnect() end)
+        pcall(function() c3:Disconnect() end)
+        hookedSounds[snd] = nil
+        entry.muted[snd] = nil
+    end)
+    table.insert(entry.conns, c3)
+
+    if snd.Playing then trigger() end
+end
+
+local function setupTool(tool)
+    if tracked[tool] then return end
+
+    local kind = matchItem(tool)
+    if not kind then return end
+
+    local handle = tool:FindFirstChild("Handle")
+    if not handle then
+        if pendingHandle[tool] then return end
+        local c
+        c = tool.ChildAdded:Connect(function(child)
+            if child.Name == "Handle" then
+                pcall(function() c:Disconnect() end)
+                pendingHandle[tool] = nil
+                if enabled then setupTool(tool) end
+            end
+        end)
+        pendingHandle[tool] = c
+        return
+    end
+
+    local entry = { hidden = {}, conns = {}, muted = {}, kind = kind }
+    tracked[tool] = entry
+
+    for _, d in ipairs(tool:GetDescendants()) do
+        pcall(hidePart, entry, d)
+    end
+
+    local skinData
+    if kind == "Bat" then
+        skinData = SKINS[BAT_SKIN_NAME] or SKINS.DiamondSword
+    else
+        skinData = SKINS[MEDUSA_SKIN_NAME] or SKINS.DesertEagle
+    end
+
+    local ok, err = pcall(buildReplica, handle, skinData)
+    if not ok then
+        warn("[Custom Tools] buildReplica failed:", err)
+    end
+
+    local soundData = SOUNDS[kind]
+    if soundData then
+        pcall(function()
+            local old = handle:FindFirstChild("CustomSound")
+            if old then old:Destroy() end
+
+            local cs = Instance.new("Sound")
+            cs.Name        = "CustomSound"
+            cs.SoundId     = soundData.id
+            cs.Volume      = 1
+            cs.Looped      = false
+            cs.RollOffMode = Enum.RollOffMode.Inverse
+            cs.MaxDistance = 1000
+            cs.MinDistance = 1000
+            cs.Parent      = handle
+
+            entry.sound     = cs
+            entry.soundData = soundData
+
+            for _, d in ipairs(tool:GetDescendants()) do
+                pcall(hookSound, entry, d)
+            end
+
+            table.insert(entry.conns, tool.DescendantAdded:Connect(function(d)
+                if tracked[tool] then pcall(hookSound, entry, d) end
+            end))
+        end)
+    end
+
+    table.insert(entry.conns, tool.DescendantAdded:Connect(function(d)
+        if tracked[tool] then pcall(hidePart, entry, d) end
+    end))
+
+    table.insert(entry.conns, tool.AncestryChanged:Connect(function(_, parent)
+        if not parent then teardown(tool) end
+    end))
+end
+
+function teardown(tool)
+    local entry = tracked[tool]
+    if not entry then return end
+
+    if entry.timer then
+        pcall(task.cancel, entry.timer)
+        entry.timer = nil
+    end
+
+    for _, conn in ipairs(entry.conns) do
+        pcall(function() conn:Disconnect() end)
+    end
+
+    local handle = tool:FindFirstChild("Handle")
+    if handle then
+        local rep = handle:FindFirstChild("LocalReplica")
+        if rep then pcall(function() rep:Destroy() end) end
+    end
+
+    if entry.sound then
+        pcall(function() entry.sound:Destroy() end)
+    end
+
+    for obj, orig in pairs(entry.hidden) do
+        if obj and obj.Parent then
+            pcall(function() obj.Transparency = orig end)
+        end
+    end
+
+    for snd, vol in pairs(entry.muted) do
+        hookedSounds[snd] = nil
+        if snd and snd.Parent then
+            pcall(function() snd.Volume = vol end)
+        end
+    end
+
+    tracked[tool] = nil
+end
+
+local function tryRegister(inst)
+    if not enabled then return end
+    if inst:IsA("Tool") and matchItem(inst) then
+        pcall(setupTool, inst)
+    end
+end
+
+local function unwatch(container)
+    local conns = watchers[container]
+    if not conns then return end
+    for _, c in ipairs(conns) do
+        pcall(function() c:Disconnect() end)
+    end
+    watchers[container] = nil
+end
+
+local function watch(container)
+    if not container or watchers[container] then return end
+    watchers[container] = { container.ChildAdded:Connect(tryRegister) }
+    for _, child in ipairs(container:GetChildren()) do
+        pcall(tryRegister, child)
+    end
+end
+
+local function watchAll()
+    watch(LP:FindFirstChildOfClass("Backpack"))
+    watch(LP.Character)
+end
+
+LP.ChildAdded:Connect(function(child)
+    if enabled and child:IsA("Backpack") then
+        watch(child)
+    end
+end)
+
+LP.CharacterAdded:Connect(function(char)
+    task.wait(0.1)
+    for tool in pairs(tracked) do
+        pcall(teardown, tool)
+    end
+    for _, c in pairs(pendingHandle) do
+        pcall(function() c:Disconnect() end)
+    end
+    table.clear(pendingHandle)
+    for container in pairs(watchers) do
+        unwatch(container)
+    end
+    if not enabled then return end
+    watch(char)
+    task.defer(function()
+        if enabled then watchAll() end
+    end)
+end)
+
+local function setEnabled(on)
+    enabled = on and true or false
+
+    if enabled then
+        watchAll()
+    else
+        for tool in pairs(tracked) do
+            pcall(teardown, tool)
+        end
+        for _, c in pairs(pendingHandle) do
+            pcall(function() c:Disconnect() end)
+        end
+        table.clear(pendingHandle)
+        for container in pairs(watchers) do
+            unwatch(container)
+        end
+    end
+end
+
+_G.fa4e7xxCustomToolsSetEnabled = setEnabled
+
