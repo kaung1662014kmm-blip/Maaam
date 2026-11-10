@@ -1,0 +1,528 @@
+local ANIM_ID = "70883871260184"
+local START_TIME = 0.01
+local SABCOM_TP = 2.5
+local SABCOM_WEIGHT = 0.03
+local BIG = 25
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+local LocalPlayer = Players.LocalPlayer
+while not LocalPlayer do
+	task.wait()
+	LocalPlayer = Players.LocalPlayer
+end
+if not LocalPlayer.Character then LocalPlayer.CharacterAdded:Wait() end
+LocalPlayer.Character:WaitForChild("Humanoid")
+
+local FlashEnabled = false
+local AntiFlashEnabled = false
+local CurrentTrack = nil
+local AnimConnection = nil
+local HeartbeatConnection = nil
+
+local ParentGui
+if gethui then
+	ParentGui = gethui()
+elseif syn and syn.protect_gui then
+	ParentGui = Instance.new("Folder")
+	syn.protect_gui(ParentGui)
+	ParentGui.Parent = game:GetService("CoreGui")
+else
+	ParentGui = game:GetService("CoreGui")
+end
+
+pcall(function()
+	local old = ParentGui:FindFirstChild("CombinedFlasher")
+	if old then old:Destroy() end
+end)
+
+local Theme = {
+	Bg     = Color3.fromRGB(10, 10, 10),
+	Panel  = Color3.fromRGB(16, 16, 16),
+	Row    = Color3.fromRGB(22, 22, 22),
+	Accent = Color3.fromRGB(220, 20, 60),
+	On     = Color3.fromRGB(220, 20, 60),
+	Off    = Color3.fromRGB(26, 26, 26),
+	Text   = Color3.fromRGB(245, 245, 245),
+	Dim    = Color3.fromRGB(140, 140, 140),
+}
+
+local function corner(inst, r)
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, r or 8)
+	c.Parent = inst
+end
+
+local function addStroke(inst, col, thick, trans)
+	local e = Instance.new("UIStroke")
+	e.Color = col or Theme.Accent
+	e.Thickness = thick or 1
+	e.Transparency = trans or 0.4
+	e.Parent = inst
+end
+
+local function tween(inst, props, t)
+	TweenService:Create(inst, TweenInfo.new(t or 0.14, Enum.EasingStyle.Quad), props):Play()
+end
+
+local function BuildAnimString(targetId)
+	local Guid = "{" .. HttpService:GenerateGUID(false):upper() .. "}"
+	local RandomNumbers = {}
+	for _ = 1, math.random(3, 5) do
+		local NumStr = ""
+		for _ = 1, 15 do
+			NumStr = NumStr .. tostring(math.random(0, 9))
+		end
+		table.insert(RandomNumbers, NumStr)
+	end
+	return "http" .. Guid .. "\xEF\xBC" .. table.concat(RandomNumbers, "\xEF\xBC") .. "=" .. targetId
+end
+
+local function EnforceLimbTransparency(character)
+	if not FlashEnabled or not character then return end
+	for _, child in ipairs(character:GetChildren()) do
+		if child:IsA("BasePart") and child.Name ~= "HumanoidRootPart" then
+			if child.Transparency ~= 1 then
+				child.Transparency = 1
+			end
+		end
+	end
+end
+
+local function ResetLimbTransparency(character)
+	if not character then return end
+	for _, child in ipairs(character:GetChildren()) do
+		if child:IsA("BasePart") and child.Name ~= "HumanoidRootPart" then
+			child.Transparency = 0
+		end
+	end
+end
+
+local function StopFreeze()
+	if HeartbeatConnection then
+		HeartbeatConnection:Disconnect()
+		HeartbeatConnection = nil
+	end
+	if AnimConnection then
+		AnimConnection:Disconnect()
+		AnimConnection = nil
+	end
+	if CurrentTrack then
+		CurrentTrack:Stop()
+		CurrentTrack = nil
+	end
+end
+
+local function ApplyFreeze(character)
+	StopFreeze()
+	if not FlashEnabled or not character then return end
+
+	local Humanoid = character:WaitForChild("Humanoid", 3)
+	if not Humanoid then return end
+	local Animator = Humanoid:WaitForChild("Animator", 3)
+	if not Animator then return end
+
+	local AnimateScript = character:WaitForChild("Animate", 2)
+	if AnimateScript then AnimateScript.Disabled = true end
+
+	local function PlayTrack()
+		if CurrentTrack then CurrentTrack:Stop() end
+		local Anim = Instance.new("Animation")
+		Anim.AnimationId = BuildAnimString(ANIM_ID)
+		CurrentTrack = Animator:LoadAnimation(Anim)
+		CurrentTrack.Priority = Enum.AnimationPriority.Action4
+		CurrentTrack:Play()
+		CurrentTrack.TimePosition = START_TIME
+		CurrentTrack:AdjustSpeed(0)
+		for _, track in ipairs(Animator:GetPlayingAnimationTracks()) do
+			if track ~= CurrentTrack then track:Stop() end
+		end
+	end
+
+	PlayTrack()
+
+	HeartbeatConnection = RunService.Heartbeat:Connect(function()
+		if FlashEnabled then
+			if CurrentTrack and not CurrentTrack.IsPlaying then PlayTrack() end
+			EnforceLimbTransparency(character)
+		end
+	end)
+
+	AnimConnection = Animator.AnimationPlayed:Connect(function(track)
+		if track ~= CurrentTrack then track:Stop() end
+	end)
+end
+
+local sabcomTracks = {}
+
+local function SabcomStop()
+	for _, t in ipairs(sabcomTracks) do
+		pcall(function() t:AdjustWeight(0, 0) end)
+		pcall(function() t:Stop(0) end)
+		pcall(function() t:Destroy() end)
+	end
+	sabcomTracks = {}
+end
+
+local function SabcomPulse()
+	SabcomStop()
+	local chr = LocalPlayer.Character
+	if not chr then return end
+	local anm = chr:FindFirstChildWhichIsA("Animator", true)
+	if not anm then return end
+	if not anm.LoadAnimationCoreScript then return end
+
+	local a = Instance.new("Animation")
+	a.AnimationId = "rbxassetid://" .. ANIM_ID
+	local ok, t = pcall(function() return anm:LoadAnimationCoreScript(a) end)
+	if not ok or not t then return end
+
+	t:Play()
+	t.Priority = Enum.AnimationPriority.Action4
+	t.Looped = true
+	t:AdjustSpeed(0)
+	t:AdjustWeight(SABCOM_WEIGHT)
+	t.TimePosition = SABCOM_TP
+	sabcomTracks[1] = t
+
+	task.wait(0.05)
+	SabcomStop()
+end
+
+local donorMap
+local doneChars = setmetatable({}, { __mode = "k" })
+local origMeshes = setmetatable({}, { __mode = "k" })
+
+local function GetDonorMap()
+	if donorMap then return donorMap end
+	donorMap = {}
+	pcall(function()
+		local r = Players:CreateHumanoidModelFromDescription(
+			Instance.new("HumanoidDescription"), Enum.HumanoidRigType.R15)
+		for _, d in ipairs(r:GetChildren()) do
+			if d:IsA("MeshPart") then donorMap[d.Name] = d.MeshId end
+		end
+		r:Destroy()
+	end)
+	return donorMap
+end
+
+local function Unskin(c)
+	if doneChars[c] then return end
+	doneChars[c] = true
+	local mp = GetDonorMap()
+	for _, d in ipairs(c:GetChildren()) do
+		if d:IsA("MeshPart") and mp[d.Name] then
+			pcall(function()
+				if d.HasSkinnedMesh then
+					if origMeshes[d] == nil then origMeshes[d] = d.MeshId end
+					d.MeshId = mp[d.Name]
+					d.HasSkinnedMesh = false
+				end
+			end)
+		end
+	end
+end
+
+local function Reskin()
+	for d, id in pairs(origMeshes) do
+		pcall(function()
+			d.MeshId = id
+			d.HasSkinnedMesh = true
+		end)
+	end
+	table.clear(origMeshes)
+	table.clear(doneChars)
+end
+
+local function IsHuge(c)
+	local ok, s = pcall(function() return c:GetExtentsSize() end)
+	return ok and s and (s.X > BIG or s.Y > BIG or s.Z > BIG)
+end
+
+task.spawn(function()
+	while task.wait(0.4) do
+		if AntiFlashEnabled then
+			for _, v in ipairs(Players:GetPlayers()) do
+				if v.Character and IsHuge(v.Character) then
+					pcall(Unskin, v.Character)
+				end
+			end
+		end
+	end
+end)
+
+local KillOtherAnims = true
+local HookedAnimators = setmetatable({}, { __mode = "k" })
+
+local function StopAll(animator)
+	if not animator then return end
+	pcall(function()
+		for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+			pcall(function() track:Stop(0) end)
+			pcall(function() track:AdjustSpeed(0) end)
+		end
+	end)
+end
+
+local function HookAnimator(animator)
+	if not animator or HookedAnimators[animator] then return end
+	HookedAnimators[animator] = true
+	StopAll(animator)
+	pcall(function()
+		animator.AnimationPlayed:Connect(function(track)
+			if not KillOtherAnims then return end
+			pcall(function() track:Stop(0) end)
+			pcall(function() track:AdjustSpeed(0) end)
+		end)
+	end)
+end
+
+local function HookOtherCharacter(character)
+	if not character then return end
+	task.spawn(function()
+		local AnimateScript = character:WaitForChild("Animate", 5)
+		if AnimateScript then pcall(function() AnimateScript.Disabled = true end) end
+		local Humanoid = character:WaitForChild("Humanoid", 10)
+		local Animator = Humanoid and Humanoid:WaitForChild("Animator", 10)
+		if Animator then HookAnimator(Animator) end
+	end)
+end
+
+local function HookOtherPlayer(player)
+	if player == LocalPlayer then return end
+	if player.Character then HookOtherCharacter(player.Character) end
+	player.CharacterAdded:Connect(HookOtherCharacter)
+end
+
+for _, player in ipairs(Players:GetPlayers()) do
+	pcall(HookOtherPlayer, player)
+end
+Players.PlayerAdded:Connect(function(player)
+	pcall(HookOtherPlayer, player)
+end)
+
+task.spawn(function()
+	while true do
+		task.wait(0.25)
+		if KillOtherAnims then
+			for _, player in ipairs(Players:GetPlayers()) do
+				if player ~= LocalPlayer then
+					local Character = player.Character
+					if Character then
+						local AnimateScript = Character:FindFirstChild("Animate")
+						if AnimateScript and not AnimateScript.Disabled then
+							pcall(function() AnimateScript.Disabled = true end)
+						end
+						local Humanoid = Character:FindFirstChildOfClass("Humanoid")
+						local Animator = Humanoid and Humanoid:FindFirstChildOfClass("Animator")
+						if Animator then
+							HookAnimator(Animator)
+							StopAll(Animator)
+						end
+					end
+				end
+			end
+		end
+	end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function(character)
+	character:WaitForChild("Humanoid")
+	if FlashEnabled then
+		ApplyFreeze(character)
+		task.delay(0.3, SabcomPulse)
+	end
+end)
+
+local sg = Instance.new("ScreenGui")
+sg.Name = "CombinedFlasher"
+sg.ResetOnSpawn = false
+sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+sg.Parent = ParentGui
+
+local PW, PH = 220, 130
+
+local panel = Instance.new("Frame")
+panel.Name = "Panel"
+panel.Size = UDim2.new(0, PW, 0, PH)
+panel.Position = UDim2.new(0.5, -PW / 2, 0.1, 0)
+panel.BackgroundColor3 = Theme.Bg
+panel.BorderSizePixel = 0
+panel.Parent = sg
+corner(panel, 10)
+addStroke(panel, Theme.Accent, 1, 0.4)
+
+local bar = Instance.new("Frame")
+bar.Size = UDim2.new(1, 0, 0, 28)
+bar.BackgroundColor3 = Theme.Panel
+bar.BorderSizePixel = 0
+bar.Parent = panel
+corner(bar, 10)
+
+local barFill = Instance.new("Frame")
+barFill.Size = UDim2.new(1, 0, 0, 10)
+barFill.Position = UDim2.new(0, 0, 1, -10)
+barFill.BackgroundColor3 = Theme.Panel
+barFill.BorderSizePixel = 0
+barFill.Parent = bar
+
+local dot = Instance.new("Frame")
+dot.Size = UDim2.new(0, 6, 0, 6)
+dot.Position = UDim2.new(0, 10, 0.5, -3)
+dot.BackgroundColor3 = Theme.Accent
+dot.BorderSizePixel = 0
+dot.Parent = bar
+corner(dot, 3)
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -24, 1, 0)
+title.Position = UDim2.new(0, 22, 0, 0)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.TextSize = 12
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.TextColor3 = Theme.Text
+title.Text = "Flasher"
+title.Parent = bar
+
+do
+	local dragObj, dragStart, startPos
+	bar.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			dragObj = input
+			dragStart = input.Position
+			startPos = panel.Position
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragObj = nil
+				end
+			end)
+		end
+	end)
+	bar.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement
+			or input.UserInputType == Enum.UserInputType.Touch then
+			if dragObj then
+				local d = input.Position - dragStart
+				panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
+			end
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		if dragObj and input == dragObj then return end
+		if dragObj and (input.UserInputType == Enum.UserInputType.MouseMovement) then
+			local d = input.Position - dragStart
+			panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
+		end
+	end)
+end
+
+local togUpdaters = {}
+
+local function MakeToggle(y, txt, key, onToggle)
+	local b = Instance.new("TextButton")
+	b.Position = UDim2.new(0, 8, 0, y)
+	b.Size = UDim2.new(1, -16, 0, 28)
+	b.BorderSizePixel = 0
+	b.Font = Enum.Font.Gotham
+	b.TextSize = 12
+	b.TextColor3 = Theme.Text
+	b.AutoButtonColor = false
+	b.Parent = panel
+	corner(b, 6)
+
+	local pill = Instance.new("Frame")
+	pill.Size = UDim2.new(0, 32, 0, 16)
+	pill.Position = UDim2.new(1, -40, 0.5, -8)
+	pill.BorderSizePixel = 0
+	pill.Parent = b
+	corner(pill, 8)
+
+	local knob = Instance.new("Frame")
+	knob.Size = UDim2.new(0, 12, 0, 12)
+	knob.Position = UDim2.new(0, 2, 0.5, -6)
+	knob.BorderSizePixel = 0
+	knob.BackgroundColor3 = Theme.Text
+	knob.Parent = pill
+	corner(knob, 6)
+
+	local state = false
+
+	local function refresh()
+		tween(b, { BackgroundColor3 = state and Color3.fromRGB(30, 8, 12) or Theme.Off })
+		tween(pill, { BackgroundColor3 = state and Theme.On or Color3.fromRGB(48, 48, 48) })
+		tween(knob, { Position = state and UDim2.new(1, -14, 0.5, -6) or UDim2.new(0, 2, 0.5, -6) })
+		b.Text = "  " .. txt
+		b.TextXAlignment = Enum.TextXAlignment.Left
+	end
+
+	togUpdaters[key] = function(v)
+		state = v
+		refresh()
+	end
+
+	b.MouseButton1Click:Connect(function()
+		state = not state
+		refresh()
+		if onToggle then onToggle(state) end
+	end)
+
+	b.MouseEnter:Connect(function()
+		tween(b, { BackgroundColor3 = state and Color3.fromRGB(38, 12, 16) or Color3.fromRGB(32, 32, 32) })
+	end)
+	b.MouseLeave:Connect(refresh)
+
+	refresh()
+	return function() return state end
+end
+
+MakeToggle(34, "FLASH", "flash", function(on)
+	FlashEnabled = on
+	if on then
+		if LocalPlayer.Character then
+			ApplyFreeze(LocalPlayer.Character)
+			task.delay(0.05, SabcomPulse)
+		end
+	else
+		StopFreeze()
+		SabcomStop()
+		if LocalPlayer.Character then
+			local anim = LocalPlayer.Character:FindFirstChild("Animate")
+			if anim then anim.Disabled = false end
+			ResetLimbTransparency(LocalPlayer.Character)
+		end
+	end
+end)
+
+MakeToggle(68, "ANTI FLASH", "anti", function(on)
+	AntiFlashEnabled = on
+	if not on then Reskin() end
+end)
+
+local brand = Instance.new("TextLabel")
+brand.Size = UDim2.new(1, 0, 0, 18)
+brand.Position = UDim2.new(0, 0, 1, -20)
+brand.BackgroundTransparency = 1
+brand.Font = Enum.Font.GothamBold
+brand.TextSize = 11
+brand.TextColor3 = Theme.Dim
+brand.Text = "leaked at discord.gg/Z7vPrxecnJ"
+brand.Parent = panel
+
+task.defer(function()
+	task.wait(0.1)
+	FlashEnabled = true
+	if togUpdaters.flash then togUpdaters.flash(true) end
+	if LocalPlayer.Character then
+		ApplyFreeze(LocalPlayer.Character)
+		task.delay(0.05, SabcomPulse)
+	end
+end)
